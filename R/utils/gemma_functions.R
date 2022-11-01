@@ -1,28 +1,26 @@
 ## Code for importing and working with Gemma data. 
-## TODO: Most of this was ported in from a quick first pass in 19_. Needs to be
-## cleaned and tested
+## -----------------------------------------------------------------------------
 
 library(tidyverse)
-library(gemmaAPI)
 
 
-list_result_sets <- function(GSE,
-                             results_dir = "~/Data/Expression_files/Gemma/Resultsets/") {
-  # list the resultset .txt files for the input GSE
-  # GSE : chr of form "GSEXXX"
+
+# list the resultset .txt files for the input GSE
+# GSE : chr of form "GSEXXX"
+
+list_result_sets <- function(GSE, results_dir) {
   
   list.files(path = paste0(results_dir, GSE),
              pattern = "resultset")
 }
 
 
-load_result_set <- function(GSE, 
-                            file,
-                            results_dir = "~/Data/Expression_files/Gemma/Resultsets/") {
-  # Read in the resultset table for the given GSE accession and file name.
-  # Change gene symbol column name for consistency with peak tables
-  # GSE : chr of form "GSEXXX"
-  # file : chr, example "resultset_ID480379.data.txt"
+# Read in the resultset table for the given GSE accession and file name.
+# Change colname Gene_Symbol -> Symbol to match format in other tables
+# GSE : chr of form "GSEXXX"
+# file : chr, example "resultset_ID480379.data.txt"
+
+load_result_set <- function(GSE, file, results_dir) {
   
   table <- read.delim(
     paste0(results_dir, GSE, "/", file),
@@ -32,15 +30,17 @@ load_result_set <- function(GSE,
   )
   colnames(table)[colnames(table) == "Gene_Symbol"] <- "Symbol"
   warning_blank_table(table)
-  return (table)
+  
+  return(table)
 }
 
 
-warning_blank_table <- function (rs) {
-  # Generate a warning if the supplied resultset table has no rows or no
-  # mapped symbols
-  # rs : resultset dataframe downloaded from gemma
-  
+# Generate a warning if the supplied resultset table has no rows or no
+# mapped symbols
+# rs : resultset dataframe downloaded from gemma
+
+warning_blank_table <- function(rs) {
+
   if (nrow(rs) == 0) {
     warning("No rows in resultset table")
   } else if (all(rs$Symbol == "")) {
@@ -49,10 +49,12 @@ warning_blank_table <- function (rs) {
 }
 
 
+# Return unique colname patterns that match symbol. Helper to curate desired
+# columns of effect sizes from result set table when multiple columns exist
+# rs : resultset dataframe downloaded from gemma
+# symbol: chr assumed to contain a match in the colnames of rs
+
 match_colnames <- function(rs, symbol) {
-  
-  # Return unique colname patterns that match symbol. Helper to curate desired
-  # columns of interest when multiple exist
   
   cols <- NA
   match <- str_detect(str_to_lower(colnames(rs)), str_to_lower(symbol))
@@ -62,13 +64,14 @@ match_colnames <- function(rs, symbol) {
 }
 
 
+# retrieve the indices corresponding to the input symbol
+# rs : resultset dataframe downloaded from gemma
+# symbol : chr, example "TCF4"
+# exact : logical, if TRUE then return the exact pattern match to symbol,
+#         if FALSE allow for fuzzier matching
+
 which_symbol <- function(rs, symbol, exact = TRUE) {
-  # retrieve the indices corresponding to the input symbol
-  # rs : resultset dataframe downloaded from gemma
-  # symbol : chr, example "TCF4"
-  # exact : logical, if TRUE then return the exact pattern match to symbol,
-  #         if FALSE allow for fuzzier matching
-  
+ 
   stopifnot("Symbol" %in% colnames(rs))
   if (!exact) {
     which(str_detect(rs$Symbol, symbol))
@@ -78,13 +81,14 @@ which_symbol <- function(rs, symbol, exact = TRUE) {
 }
 
 
+
+# extract the rows corresponding to the input symbol
+# rs : resultset dataframe downloaded from gemma
+# symbol : chr, example "TCF4"
+# exact : logical, if TRUE then return the exact pattern match to symbol,
+#         if FALSE allow for fuzzier matching
+
 filter_symbol <- function(rs, symbol, exact = TRUE) {
-  # extract the rows corresponding to the input symbol
-  # rs : resultset dataframe downloaded from gemma
-  # symbol : chr, example "TCF4"
-  # exact : logical, if TRUE then return the exact pattern match to symbol,
-  #         if FALSE allow for fuzzier matching
-  
   
   stopifnot("Symbol" %in% colnames(rs))
   if (!exact) {
@@ -258,38 +262,3 @@ filter_by_max_tstat <- function(rs) {
     filter(abs(FoldChange) == max(abs(FoldChange))) %>% 
     dplyr::slice(1)
 }
-
-
-
-
-
-
-## OLD
-
-# get_relevant_cols <- function(resultset_table, symbol) {
-#   # given a gemma resultset table and a symbol, return only the columns of the 
-#   # resultset table that are matched to the symbol
-#   # resultset_table : resultset table downloaded from gemma
-#   # symbol : chr, example "TCF4"
-#   
-#   result_names <- colnames(resultset_table)
-#   gene_names_ix <- which(c("Element_Name", "Symbol", "Gene_Name", "NCBI_ID") %in% result_names)
-#   
-#   target_fc <- which(str_detect(
-#     string = result_names,
-#     pattern =  paste0("^FoldChange_", ".*", symbol, "\\.")
-#   ))
-#   
-#   target_tstat <- which(str_detect(
-#     string = result_names,
-#     pattern =  paste0("^Tstat_", ".*", symbol, "\\.")
-#   ))
-#   
-#   target_pval <- which(str_detect(
-#     string = result_names,
-#     pattern =  paste0("^PValue_", ".*", symbol, "\\.")
-#   ))
-#   
-#   return(resultset_table[, c(gene_names_ix, target_fc, target_pval, target_tstat)])
-# }
-
