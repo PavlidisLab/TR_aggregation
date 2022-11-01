@@ -6,54 +6,59 @@ A note about the structure/organization of the scripts, which follows the logic 
 
 Multiple aspects of the analysis came from rounds of curation on google sheets, and drawing on data
 available on the Pavlab servers that are not readily shareable (like the aligned signal tracks
-for every ChIP-seq experiment). Summarized data and curated sheets used for analysis are provided 
-wherever possible. Please reach out if there is additional information required.
+for every ChIP-seq experiment). Some data paths are hard coded to point to these sources. Summarized 
+data and curated sheets used for analysis are provided wherever possible. Please contact if additional 
+information is required.
 
 
-### setup
+### setup-
 
 ````
 01
 ````
 
 
-### chipmeta
+### chipmeta-
 
 ```
 01
 ```
 
-### chipmatrix
+### chipmatrix-
 
 ```
 01
 ```
 
-### chipgr
+### chipgr-
 
 ```
 01
 ```
 
-### trackplot
+### trackplot-
 
 ```
 01
 ````
 
-### gemma
+### gemma-
+These scripts are for organizing the expression perturbation data. These scripts are reliant on a metadata
+sheet tracked in Googlesheets that recorded experiments. Note that this process was start before
+Gemma.R functionality was finalized, and thus experiments of interest were downloaded on Pavlab servers and 
+more or less manually tracked in a sheet. Future efforts would be wise to access the data via Gemma.R
+
+```
+01_match_resultsets_to_experiments.R :  
+```
+
+### perturbmatrix-
 
 ```
 01
 ```
 
-### perturbmatrix
-
-```
-01
-```
-
-### intersect
+### intersect-
 ```
 01
 ```
