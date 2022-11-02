@@ -43,13 +43,20 @@ information is required.
 ````
 
 ### gemma-
-These scripts are for organizing the expression perturbation data. These scripts are reliant on a metadata
-sheet tracked in Googlesheets that recorded experiments. Note that this process was start before
-Gemma.R functionality was finalized, and thus experiments of interest were downloaded on Pavlab servers and 
-more or less manually tracked in a sheet. Future efforts would be wise to access the data via Gemma.R
+These scripts are for organizing the expression perturbation data. These scripts
+are reliant on a metadata sheet tracked in Googlesheets that recorded 
+experiments. Note that this process was start before Gemma.R functionality was 
+finalized, and thus experiments of interest were downloaded on Pavlab servers 
+and more or less manually tracked in a sheet. Future efforts would be wise to 
+access the data via Gemma.R
 
 ```
-01_match_resultsets_to_experiments.R :  
+01_match_resultsets_to_experiments.R :  Reads curated table from Gsheets, flags
+experiments that need to be curated/paired to a resultset ID, and saves hard
+copy of metadata
+
+02_save_tfperturb_rds.R : Reads curated table that matches resultset IDs to 
+experiments. Loads, processes, and saves these experiments to an RDS object
 ```
 
 ### perturbmatrix-
