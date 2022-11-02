@@ -15,6 +15,7 @@ list_result_sets <- function(GSE, results_dir) {
 }
 
 
+
 # Read in the resultset table for the given GSE accession and file name.
 # Change colname Gene_Symbol -> Symbol to match format in other tables
 # GSE : chr of form "GSEXXX"
@@ -35,6 +36,7 @@ load_result_set <- function(GSE, file, results_dir) {
 }
 
 
+
 # Generate a warning if the supplied resultset table has no rows or no
 # mapped symbols
 # rs : resultset dataframe downloaded from gemma
@@ -47,6 +49,7 @@ warning_blank_table <- function(rs) {
     warning("All mapped symbols are blank")
   }
 }
+
 
 
 # Return unique colname patterns that match symbol. Helper to curate desired
@@ -62,6 +65,7 @@ match_colnames <- function(rs, symbol) {
   cols <- unique(str_replace_all(cols, "FoldChange_|Tstat_|PValue_", ""))
   return(cols)
 }
+
 
 
 # retrieve the indices corresponding to the input symbol
@@ -99,9 +103,11 @@ filter_symbol <- function(rs, symbol, exact = TRUE) {
 }
 
 
+
+# provide the index of the Tstat columns.
+# rs : resultset dataframe downloaded from gemma
+
 which_tstat_column <- function(rs) {
-  # provide the index of the Tstat columns.
-  # rs : resultset dataframe downloaded from gemma
   
   which(str_detect(
     string = colnames(rs), 
@@ -109,9 +115,10 @@ which_tstat_column <- function(rs) {
 }
 
 
+# provide the index of the fold change columns.
+# rs : resultset dataframe downloaded from gemma
+
 which_fc_column <- function(rs) {
-  # provide the index of the fold change columns.
-  # rs : resultset dataframe downloaded from gemma
   
   which(str_detect(
     string = colnames(rs), 
@@ -119,19 +126,23 @@ which_fc_column <- function(rs) {
 }
 
 
+
+# provide the index of the unadjusted pvalue columns.
+# rs : resultset dataframe downloaded from gemma
+
 which_pval_column <- function(rs) {
-  # provide the index of the unadjusted pvalue columns.
-  # rs : resultset dataframe downloaded from gemma
-  
+
   which(str_detect(
     string = colnames(rs), 
     pattern = "^PValue"))
 }
 
 
+
+# Return rs with only the descriptive columns and stat columns whose suffix  
+# match the provided string. 
+
 keep_match_cols <- function(rs, string) {
-  # Return rs with only the descriptive columns and stat columns whose suffix  
-  # match the provided string. 
   
   cols <- str_replace_all(colnames(rs), "Tstat_|PValue_|FoldChange_", "")
   match_cols <- which(cols == string)
@@ -139,8 +150,10 @@ keep_match_cols <- function(rs, string) {
 }
 
 
+
+# Remove the experiment info suffix from Pval/Tstat/FC
+
 strip_colnames <- function(rs) {
-  # Remove the experiment info suffix from Pval/Tstat/FC
   
   stopifnot(ncol(rs) == 7)
   colnames(rs)[5:7] <- str_replace_all(colnames(rs)[5:7], "_.*", "")
@@ -148,12 +161,15 @@ strip_colnames <- function(rs) {
 }
 
 
+
+# provide the index of the maximum absolute Tstat in the resultset table
+# rs : resultset dataframe downloaded from gemma
+
 which_max_tstat <- function(rs) {
-  # provide the index of the maximum absolute Tstat in the resultset table
-  # rs : resultset dataframe downloaded from gemma
   
   which.max(abs(rs[, which_tstat_column(rs)]))
 }
+
 
 
 get_max_tstat <- function(rs) {
@@ -164,14 +180,17 @@ get_max_tstat <- function(rs) {
 }
 
 
+
+# extract the row corresponding to the max T stat for the supplied symbol.
+# note that some symbols may have multiple mapped probes, and so this only
+# returns the absolute maximum tstat
+# rs : resultset dataframe downloaded from gemma
+# symbol : chr, example "TCF4"
+# exact : logical, if TRUE then return the exact pattern match to symbol,
+#         if FALSE allow for fuzzier matching
+
 get_max_tstat_by_symbol <- function(rs, symbol, exact = TRUE) {
-  # extract the row corresponding to the max T stat for the supplied symbol.
-  # note that some symbols may have multiple mapped probes, and so this only
-  # returns the absolute maximum tstat
-  # rs : resultset dataframe downloaded from gemma
-  # symbol : chr, example "TCF4"
-  # exact : logical, if TRUE then return the exact pattern match to symbol,
-  #         if FALSE allow for fuzzier matching
+
   
   if (!exact) {
     filter_table <- filter_symbol(rs, symbol, exact = FALSE)
@@ -184,30 +203,36 @@ get_max_tstat_by_symbol <- function(rs, symbol, exact = TRUE) {
 }
 
 
+
+# provide the index of the maximum absolute fold change in the resultset table
+# rs : resultset dataframe downloaded from gemma
+
 which_max_fc <- function(rs) {
-  # provide the index of the maximum absolute fold change in the resultset table
-  # rs : resultset dataframe downloaded from gemma
   
   which.max(abs(rs[, which_fc_column(rs)]))
 }
 
 
+
+# extract the row corresponding to the max T stat
+# rs : resultset dataframe downloaded from gemma
+
 get_max_fc <- function(rs) {
-  # extract the row corresponding to the max T stat
-  # rs : resultset dataframe downloaded from gemma
   
   rs[which_max_fc(rs), ]
 }
 
 
+
+# extract the row corresponding to the max fold change for the supplied symbol.
+# note that some symbols may have multiple mapped probes, and so this only
+# returns the absolute maximum fold change
+# rs : resultset dataframe downloaded from gemma
+# symbol : chr, example "TCF4"
+# exact : logical, if TRUE then return the exact pattern match to symbol,
+#         if FALSE allow for fuzzier matching
+
 get_max_fc_by_symbol <- function(rs, symbol, exact = TRUE) {
-  # extract the row corresponding to the max fold change for the supplied symbol.
-  # note that some symbols may have multiple mapped probes, and so this only
-  # returns the absolute maximum fold change
-  # rs : resultset dataframe downloaded from gemma
-  # symbol : chr, example "TCF4"
-  # exact : logical, if TRUE then return the exact pattern match to symbol,
-  #         if FALSE allow for fuzzier matching
   
   if (!exact) {
     filter_table <- filter_symbol(rs, symbol, exact = FALSE)
@@ -220,29 +245,35 @@ get_max_fc_by_symbol <- function(rs, symbol, exact = TRUE) {
 }
 
 
+
+# Return a vector containing the ranks of the absolute fold change of the
+# input gemma resultset table. Higher rank = more differentially expressed
+# rs : resultset dataframe downloaded from gemma
+
 get_rank_fc <- function(rs) {
-  # Return a vector containing the ranks of the absolute fold change of the
-  # input gemma resultset table. Higher rank = more differentially expressed
-  # rs : resultset dataframe downloaded from gemma
 
   rank(abs(rs[, which_fc_column(rs)]))
 }
 
 
+
+# Return a vector containing the percentile ranks of the absolute fold change of the
+# input gemma resultset table. 1 = the max differentially expressed, 0 the min
+# rs : resultset dataframe downloaded from gemma
+
 get_perc_rank_fc <- function(rs) {
-  # Return a vector containing the percentile ranks of the absolute fold change of the
-  # input gemma resultset table. 1 = the max differentially expressed, 0 the min
-  # rs : resultset dataframe downloaded from gemma
   
   fc_rank <- get_rank_fc(rs)
   round(fc_rank/length(fc_rank), 5)
 }
 
 
+
+# Remove probes/elements lacking a symbol or mapped to multiple symbols
+# rs : resultset dataframe downloaded from gemma
+
 keep_single_symbols <- function(rs) {
-  # Remove probes/elements lacking a symbol or mapped to multiple symbols
-  # rs : resultset dataframe downloaded from gemma
- 
+  
   cleaned_table <- filter(rs,
                           (!str_detect(Symbol, "\\|") &
                              str_detect(Symbol, boundary("character"))))
@@ -251,10 +282,12 @@ keep_single_symbols <- function(rs) {
 }
 
 
+
+# Given a resultset table, find any symbols that have multiple probes,
+# and only keep the probe with the highest tstat. Take first row of highest 
+# fold change if there is a tie
+
 filter_by_max_tstat <- function(rs) {
-  # Given a resultset table, find any symbols that have multiple probes,
-  # and only keep the probe with the highest tstat. Take first row of highest 
-  # fold change if there is a tie
   
   rs %>% 
     group_by(Symbol) %>% 
