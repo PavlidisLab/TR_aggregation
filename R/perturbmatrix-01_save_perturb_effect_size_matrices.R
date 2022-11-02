@@ -5,15 +5,17 @@
 
 library(tidyverse)
 library(parallel)
-source("~/regnetR/R/utils/gemma_functions.R")
+source("R/setup-01_config.R")
+source("R/utils/gemma_functions.R")
 
-date <- "Apr2022"  # latest data freeze
-outdir <- "~/Data/Expression_files/Perturb_matrix/"
-meta <- read.delim(file =  paste0("~/Data/Metadata/Gemma/batch1_tfperturb_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
-results <- readRDS(paste0("~/Data/Expression_files/Gemma/TF_perturb_batch1_rslist_", date, ".RDS"))
-pc_hg <- read.delim("~/Data/Metadata/refseq_select_hg38.tsv", stringsAsFactors = FALSE)
-pc_mm <- read.delim("~/Data/Metadata/refseq_select_mm10.tsv", stringsAsFactors = FALSE)
-pc_ortho <- read.delim("~/Data/Metadata/hg_mm_1to1_ortho_genes_DIOPT-v8.tsv", stringsAsFactors = FALSE)
+# load meta and list of perturb experiments
+meta <- read.delim(file =  paste0(meta_dir, "batch1_tfperturb_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
+results <- readRDS(paste0(expr_dir, "TF_perturb_batch1_rslist_", date, ".RDS"))
+
+# protein coding tables for creating ortho table
+pc_hg <- read.delim(paste0(meta_dir, "refseq_select_hg38.tsv"), stringsAsFactors = FALSE)
+pc_mm <- read.delim(paste0(meta_dir, "refseq_select_mm10.tsv"), stringsAsFactors = FALSE)
+pc_ortho <- read.delim(paste0(meta_dir, "hg_mm_1to1_ortho_genes_DIOPT-v8.tsv"), stringsAsFactors = FALSE)
 
 stopifnot(identical(names(results), meta$Experiment_ID))
 
@@ -28,8 +30,8 @@ symbol_mm <- unique(pc_mm$Symbol)
 # ------------------------------------------------------------------------------
 
 
+# Remove genes/rows for which all observations are NA
 rm_all_na <- function(mat) {
-  # Remove genes/rows for which all observations are NA
   all_na <- which(apply(mat, 1, function(x) sum(is.na(x)) == ncol(mat)))
   if (length(all_na) > 0) mat <- mat[-all_na, ]
   return(mat)
@@ -37,9 +39,9 @@ rm_all_na <- function(mat) {
 
 
 
+# Return a list of Tstat/FC/Pval/FDR matrices for experiments contained in meta
+
 get_mat_list <- function(meta, symbol, result_list) {
-  
-  # Return a list of Tstat/FC/Pval/FDR matrices for experiments contained in meta
   
   tf_mat <- matrix(nrow = length(symbol), ncol = nrow(meta))
   rownames(tf_mat) <- symbol
@@ -126,6 +128,6 @@ mlist_ortho <- lapply(mlist_ortho, rm_all_na)
 
 
 # Save out
-saveRDS(mlist_hg, paste0(outdir, "human_list_perturb_matrix_", date, ".RDS"))
-saveRDS(mlist_mm, paste0(outdir, "mouse_list_perturb_matrix_", date, ".RDS"))
-saveRDS(mlist_ortho, paste0(outdir, "ortho_list_perturb_matrix_", date, ".RDS"))
+saveRDS(mlist_hg, paste0(pmat_dir, "human_list_perturb_matrix_", date, ".RDS"))
+saveRDS(mlist_mm, paste0(pmat_dir, "mouse_list_perturb_matrix_", date, ".RDS"))
+saveRDS(mlist_ortho, paste0(pmat_dir, "ortho_list_perturb_matrix_", date, ".RDS"))

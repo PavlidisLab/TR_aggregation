@@ -6,33 +6,35 @@
 library(tidyverse)
 library(pheatmap)
 library(RColorBrewer)
-source("~/regnetR/R/utils/plot_functions.R")
+source("R/setup-01_config.R")
+source("R/utils/plot_functions.R")
 
 date <- "Apr2022"  # latest data freeze
-perturb_dir <- "~/Data/Expression_files/Perturb_matrix/"
-plot_dir <- "~/Plots/TF_perturb/Meta_sample_matrix/"
+pmat_dir <- "~/Data/Expression_files/Perturb_matrix/"
+plot_dir <- paste0(pplot_dir, "Meta_sample_matrix/")
 
-meta <- read.delim(file =  paste0("~/Data/Metadata/Gemma/batch1_tfperturb_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
-mlist_hg <- readRDS(paste0(perturb_dir, "human_list_perturb_matrix_", date, ".RDS"))
-mlist_mm <- readRDS(paste0(perturb_dir, "mouse_list_perturb_matrix_", date, ".RDS"))
-mlist_ortho <- readRDS(paste0(perturb_dir, "ortho_list_perturb_matrix_", date, ".RDS"))
+meta <- read.delim(file =  paste0(meta_dir, "batch1_tfperturb_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
+mlist_hg <- readRDS(paste0(pmat_dir, "human_list_perturb_matrix_", date, ".RDS"))
+mlist_mm <- readRDS(paste0(pmat_dir, "mouse_list_perturb_matrix_", date, ".RDS"))
+mlist_ortho <- readRDS(paste0(pmat_dir, "ortho_list_perturb_matrix_", date, ".RDS"))
 
-# Obtained from Nathaniel Lim
-platform_meta <- read.delim("/space/grp/nlim/CronGemmaDump/AD_Dump.TSV", stringsAsFactors = FALSE)
+# Expression platform info
+platform_meta <- read.delim(platform_path, stringsAsFactors = FALSE)
 
 
 # Functions
 #-------------------------------------------------------------------------------
 
+# Helper to get the gene/row-wise sum of non-NAs for a perturb matrix
 
 count_gene_measured <- function(mat) {
-  # Helper to get the gene/row-wise sum of non-NAs for a perturb matrix
   apply(mat, 1, function(x) sum(!is.na(x)))
 }
 
 
+# Helper to get the col/experiment-wise sum of non-NAs for a perturb matrix
+
 count_gene_coverage <- function(mat) {
-  # Helper to get the col/experiment-wise sum of non-NAs for a perturb matrix
   apply(mat, 2, function(x) sum(!is.na(x)))
 }
 
