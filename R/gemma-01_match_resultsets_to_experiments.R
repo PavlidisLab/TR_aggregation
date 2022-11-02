@@ -5,22 +5,22 @@
 
 library(googlesheets4)
 library(tidyverse)
-source("~/regnetR/R/utils/gemma_functions.R")
+source("R/setup-01_config.R")
+source("R/utils/gemma_functions.R")
 
-gsheets_id <- "1oXo1jfoPYcX94bq2F6Bqm1Es1glc8g9mnJvYAO37Vw4"
-date <- "Apr2022"
-exprs_dir <- "~/Data/Expression_files/Gemma/Resultsets/"
-meta_loaded_out <- paste0("~/Data/Metadata/Gemma/batch1_tfperturb_meta_final_", date, ".tsv")
 
-# master metadata
-meta <- read_sheet(ss = gsheets_id, 
+# Load curated perturbation metadata
+meta <- read_sheet(ss = gsheets_perturb, 
                    sheet = "Master_batch1", 
                    trim_ws = TRUE, 
                    col_types = "c")
 
+# Loaded means the experiment is in Gemma and resultsets have been downloaded
 meta_loaded <- meta[meta$Results_Loaded == 1, ]
 
-# ids of form GSE_TF_Species_Perturbation - if duplicates, add integer suffix
+
+# Make experiment ids of form GSE_TF_Species_Perturbation. If duplicates, add 
+# integer suffix
 
 ids <- paste(str_replace(meta_loaded$GSE, "\\.[:digit:]", ""),
              meta_loaded$Symbol,
@@ -37,55 +37,14 @@ meta_loaded <- meta_loaded %>%
   arrange(Symbol)
 
 
-rs_files <- lapply(meta_loaded$GSE, function(x) {
-  list.files(path = paste0(exprs_dir, x), pattern = "resultset")
-})
+# Get resultset files for each GEO identifier
+rs_files <- lapply(meta_loaded$GSE, list_result_sets, rs_dir)
 
 
-# Link IDs to result sets
-
-
-check_rs <- function(rs_df) {
-  
-  for (i in 1:nrow(rs_df)) {
-    # Loop through rs_df to open associated rs files and check colnames for
-    # match to expected symbol, or multi matches which are flagged for curation.
-      
-    if (str_detect(rs_df$Resultset_ID[i], ";")) {  # multi rs in a GEO dir
-      
-      rs_ids <- unlist(str_split(rs_df$Resultset_ID[i], ";"))
-      final_ids <- rs_ids
-      final_cols <- list()
-      
-      # If rs is not relevant (no symbol match), remove the ID. Otherwise,
-      # include all relevant cols for curation
-      
-      for (id in rs_ids) {
-        rs <- try(load_result_set(GSE = rs_df$GSE[i], file = id))
-        cols <- match_colnames(rs, rs_df$Symbol[i])
-        if (length(cols) == 0) {
-          final_ids <- setdiff(final_ids, id)
-        } else {
-          final_cols <- c(final_cols, cols)
-        }
-      }
-      
-      rs_df$Resultset_ID[i] <- paste(final_ids, collapse = ";")
-      rs_df$Match_Col[i] <- paste(unique(unlist(final_cols)), collapse = ";")
-    
-    } else { # single resultset in a GEO dir
-        
-      rs <- load_result_set(GSE = rs_df$GSE[i], file = rs_df$Resultset_ID[i])
-      cols <- paste(match_colnames(rs, rs_df$Symbol[i]), collapse = ";")
-      rs_df$Match_Col[i] <- cols
-    }
-    
-    if (any(str_detect(c(rs_df$Resultset_ID[i], rs_df$Match_Col[i]), ";"))) {
-      rs_df$Curate[i] <- TRUE
-    }
-  }
-  return(rs_df)
-}
+# Link experiment IDs to result sets. A GEO directory may contain multiple 
+# result set files beyond the one of interest, and a single file may also contain
+# contrasts beyond the experiment of interest, this information must be matched 
+# and curated.
 
 
 rs_df <- data.frame(
@@ -101,20 +60,80 @@ rs_df <- data.frame(
 )
 
 
-rs_df <- check_rs(rs_df)
+# Loop through rs_df to open associated rs files and check colnames for
+# match to expected symbol, or multi matches which are flagged for curation.
+
+check_rs <- function(rs_df, rs_dir) {
+  
+  for (i in 1:nrow(rs_df)) {
+    
+    # Multiple resultset files found in the supplied GEO dir
+    if (str_detect(rs_df$Resultset_ID[i], ";")) {  
+      
+      rs_ids <- unlist(str_split(rs_df$Resultset_ID[i], ";"))
+      final_ids <- rs_ids
+      final_cols <- list()
+      
+      # If rs is not relevant (no symbol match), remove the ID. Otherwise,
+      # include all relevant cols for curation
+      
+      for (id in rs_ids) {
+        
+        rs <- try(load_result_set(GSE = rs_df$GSE[i],
+                                  file = id,
+                                  results_dir = rs_dir))
+        
+        cols <- match_colnames(rs, rs_df$Symbol[i])
+        
+        if (length(cols) == 0) {
+          final_ids <- setdiff(final_ids, id)
+        } else {
+          final_cols <- c(final_cols, cols)
+        }
+        
+      }
+
+      rs_df$Resultset_ID[i] <- paste(final_ids, collapse = ";")
+      rs_df$Match_Col[i] <- paste(unique(unlist(final_cols)), collapse = ";")
+    
+    # A single resultset in the GEO dir
+    } else { 
+        
+      rs <- try(load_result_set(GSE = rs_df$GSE[i],
+                                file = rs_df$Resultset_ID[i],
+                                results_dir = rs_dir))
+      
+      cols <- paste(match_colnames(rs, rs_df$Symbol[i]), collapse = ";")
+      
+      rs_df$Match_Col[i] <- cols
+      
+    }
+    
+    if (any(str_detect(c(rs_df$Resultset_ID[i], rs_df$Match_Col[i]), ";"))) {
+      rs_df$Curate[i] <- TRUE
+    }
+  }
+  
+  return(rs_df)
+}
+
+
+rs_df <- check_rs(rs_df, rs_dir)
 
 
 # Order so those that need curation are at top and GSEs are clumped
 rs_df <- arrange(rs_df, !Curate, GSE)
 
+
 # save out sheet for curation and all meta of loaded
 
 write_sheet(data = rs_df, 
-            ss = gsheets_id, 
+            ss = gsheets_perturb, 
             sheet = paste0("Loaded_resultset_IDs_", date))
+
 
 write.table(meta_loaded, 
             sep = "\t",
             quote = FALSE,
             row.names = FALSE,
-            file = meta_loaded_out)
+            file = paste0(meta_dir, "batch1_tfperturb_meta_final_", date, ".tsv"))
