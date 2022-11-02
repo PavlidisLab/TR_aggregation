@@ -5,22 +5,20 @@
 library(googlesheets4)
 library(tidyverse)
 library(parallel)
-source("~/regnetR/R/utils/gemma_functions.R")
+source("R/setup-01_config.R")
+source("R/utils/gemma_functions.R")
 
-gsheets_id <- "1oXo1jfoPYcX94bq2F6Bqm1Es1glc8g9mnJvYAO37Vw4"
-date <- "Apr2022"
-exprs_dir <- "~/Data/Expression_files/Gemma/Resultsets/"
-out_file <- paste0("~/Data/Expression_files/Gemma/TF_perturb_batch1_rslist_", date, ".RDS")
-out_unfilt_file <- paste0("~/Data/Expression_files/Gemma/TF_perturb_batch1_unfiltered_rslist_", date, ".RDS")
+out_file <- paste0(expr_dir, "TF_perturb_batch1_rslist_", date, ".RDS")
+out_file_unfilt <- paste0(expr_dir, "TF_perturb_batch1_unfiltered_rslist_", date, ".RDS")
 
 # curated sheet to link experiments to resultset IDs + relevant columns
-rs_df <- read_sheet(ss = gsheets_id, 
+rs_df <- read_sheet(ss = gsheets_perturb, 
                     sheet = paste0("Curated_Loaded_resultset_IDs_", date), 
                     trim_ws = TRUE, 
                     col_types = "c")
 
 # meta to match/order saved experiments
-meta <- read.delim(paste0("~/Data/Metadata/Gemma/batch1_tfperturb_loaded_meta_", date, ".tsv"), stringsAsFactors = FALSE)
+meta <- read.delim(paste0(meta_dir, "batch1_tfperturb_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
 
 rs_df <- rs_df[order(match(rs_df$Experiment_ID, meta$Experiment_ID)), ]
 
@@ -37,12 +35,14 @@ stopifnot(identical(rs_df$Experiment_ID, meta$Experiment_ID))
 # ------------------------------------------------------------------------------
 
 
-load_rs_list <- function(rs_df, cores = 8) {
+load_rs_list <- function(rs_df, cores) {
   
   l <- mclapply(1:nrow(rs_df), function(i) {
     
     rs <-
-      load_result_set(GSE = rs_df$GSE[i], file = rs_df$Resultset_ID[i]) %>%
+      load_result_set(GSE = rs_df$GSE[i], 
+                      file = rs_df$Resultset_ID[i],
+                      results_dir = rs_dir) %>%
       keep_match_cols(string = rs_df$Match_Col[i]) %>%
       strip_colnames()
     
@@ -53,7 +53,7 @@ load_rs_list <- function(rs_df, cores = 8) {
 }
 
 
-prep_rs_list <- function(rs_list, cores = 8) {
+prep_rs_list <- function(rs_list, cores) {
   
   l <- mclapply(rs_list, function(x) {
     
@@ -73,13 +73,13 @@ prep_rs_list <- function(rs_list, cores = 8) {
 }
 
 
-if (!all(file.exists(out_file, out_unfilt_file))) {
+if (!all(file.exists(out_file, out_file_unfilt))) {
   
-  rs_unfilt_list <- load_rs_list(rs_df)
-  rs_filt_list <- prep_rs_list(rs_unfilt_list)
+  rs_unfilt_list <- load_rs_list(rs_df, cores = cores)
+  rs_filt_list <- prep_rs_list(rs_unfilt_list, cores = cores)
   
   stopifnot(all(unlist(lapply(rs_filt_list, ncol) == 9)))
   
-  saveRDS(rs_unfilt_list, file = out_unfilt_file)
+  saveRDS(rs_unfilt_list, file = out_file_unfilt)
   saveRDS(rs_filt_list, file = out_file)
 }
