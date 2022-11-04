@@ -1,4 +1,4 @@
-## Code for importing and working with Gemma data. 
+## Code for importing and working with Gemma resultset data. 
 ## -----------------------------------------------------------------------------
 
 library(tidyverse)
