@@ -24,14 +24,19 @@ rs_df <- rs_df[order(match(rs_df$Experiment_ID, meta$Experiment_ID)), ]
 
 stopifnot(identical(rs_df$Experiment_ID, meta$Experiment_ID))
 
+# protein coding genes
+pc_hg <- read.delim(paste0(meta_dir, "refseq_select_hg38.tsv"), stringsAsFactors = FALSE)
+pc_mm <- read.delim(paste0(meta_dir, "refseq_select_mm10.tsv"), stringsAsFactors = FALSE)
+
 
 # load each resultset into a list, making the following adjustments:
 # 1) Only keep relevant columns and minimal FoldChange, Tstat, PValue names
-# ** In a new list for filtered data: 
-# 2) Remove probes that map to multiple symbols or no symbols
-# 3) If there are multiple probes/entries for a symbol, keep only max abs(tstat)
-# 4) Add FDR adjusted pvals
-# 5) Add the percentile rank fold change: [0,1] of absolute fold change
+# ** In a new list for filtered data:
+# 2) Only keep protein coding genes
+# 3) Remove probes that map to multiple symbols or no symbols
+# 4) If there are multiple probes/entries for a symbol, keep only max abs(tstat)
+# 5) Add FDR adjusted pvals
+# 6) Add the percentile rank fold change: [0,1] of absolute fold change
 # ------------------------------------------------------------------------------
 
 
@@ -53,11 +58,22 @@ load_rs_list <- function(rs_df, cores) {
 }
 
 
-prep_rs_list <- function(rs_list, cores) {
+
+prep_rs_list <- function(rs_list, meta, symbol_hg, symbol_mm, cores) {
   
-  l <- mclapply(rs_list, function(x) {
+  stopifnot(identical(meta$Experiment_ID, names(rs_list)))
+  stopifnot(all(meta$Species %in% c("Human", "Mouse")))
+  
+  l <- mclapply(names(rs_list), function(x) {
     
-    x <- x %>%
+    if (filter(meta, Experiment_ID == x)$Species == "Human") {
+      symbol <- symbol_hg
+    } else  {
+      symbol <- symbol_mm
+    }
+    
+    x <- rs_list[[x]] %>%
+      filter(Symbol %in% symbol) %>% 
       keep_single_symbols() %>%
       filter_by_max_tstat()
     
@@ -68,18 +84,25 @@ prep_rs_list <- function(rs_list, cores) {
     
   }, mc.cores = cores)
   
+  names(l) <- meta$Experiment_ID
   return(l)
   
 }
 
 
+
 if (!all(file.exists(out_file, out_file_unfilt))) {
   
-  rs_unfilt_list <- load_rs_list(rs_df, cores = cores)
-  rs_filt_list <- prep_rs_list(rs_unfilt_list, cores = cores)
+  rs_list_unfilt <- load_rs_list(rs_df, cores = cores)
   
-  stopifnot(all(unlist(lapply(rs_filt_list, ncol) == 9)))
+  rs_list_filt <- prep_rs_list(rs_list_unfilt, 
+                               meta = meta,
+                               symbol_hg = pc_hg$Symbol, 
+                               symbol_mm = pc_mm$Symbol,
+                               cores = cores)
   
-  saveRDS(rs_unfilt_list, file = out_file_unfilt)
-  saveRDS(rs_filt_list, file = out_file)
+  stopifnot(all(unlist(lapply(rs_list_filt, ncol) == 9)))
+  
+  saveRDS(rs_list_unfilt, file = out_file_unfilt)
+  saveRDS(rs_list_filt, file = out_file)
 }
