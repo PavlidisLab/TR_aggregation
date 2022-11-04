@@ -1,4 +1,4 @@
-## Script that explores counts of differentially expressed genes
+## Script that explores counts of differentially expressed genes (DEGs)
 ## -----------------------------------------------------------------------------
 
 library(tidyverse)
@@ -6,27 +6,28 @@ library(parallel)
 library(cowplot)
 library(ggExtra)
 library(ggrepel)
-source("~/regnetR/R/utils/perturbmatrix_functions.R")
-source("~/regnetR/R/utils/plot_functions.R")
+source("R/setup-01_config.R")
+source("R/utils/perturbmatrix_functions.R")
+source("R/utils/plot_functions.R")
 
 fdr <- 0.1
 
-date <- "Apr2022"  # latest data freeze
-plot_dir <- "~/Plots/TF_perturb/Describe_FDR_counts/"
-out_dir <- "~/Data/TF_perturb/"
+plot_dir <- paste0(pplot_dir, "/Describe_FDR_counts/")
 
-meta <- read.delim(file =  paste0("~/Data/Metadata/Gemma/batch1_tfperturb_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
-pc_ortho <- read.delim("~/Data/Metadata/hg_mm_1to1_ortho_genes_DIOPT-v8.tsv", stringsAsFactors = FALSE)
+# Load meta and lists of perturb effect size matrices
+meta <- read.delim(file =  paste0(meta_dir, "batch1_tfperturb_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
+mlist_hg <- readRDS(paste0(pmat_dir, "human_list_perturb_matrix_", date, ".RDS"))
+mlist_mm <- readRDS(paste0(pmat_dir, "mouse_list_perturb_matrix_", date, ".RDS"))
+mlist_ortho <- readRDS(paste0(pmat_dir, "ortho_list_perturb_matrix_", date, ".RDS"))
 
-# perturb effect size matrices
-mlist_hg <- readRDS(paste0("~/Data/Expression_files/Perturb_matrix/human_list_perturb_matrix_", date, ".RDS"))
-mlist_mm <- readRDS(paste0("~/Data/Expression_files/Perturb_matrix/mouse_list_perturb_matrix_", date, ".RDS"))
-mlist_ortho <- readRDS(paste0("~/Data/Expression_files/Perturb_matrix/ortho_list_perturb_matrix_", date, ".RDS"))
+# ortho protein coding genes
+pc_ortho <- read.delim(paste0(meta_dir, "hg_mm_1to1_ortho_genes_DIOPT-v8.tsv"), stringsAsFactors = FALSE)
 
 # DE prior tables
-pdeg_hg <- read.delim("~/Data/Metadata/DE_prior_hg.tsv", stringsAsFactors = FALSE)
-pdeg_mm <- read.delim("~/Data/Metadata/DE_prior_mm.tsv", stringsAsFactors = FALSE)
+pdeg_hg <- read.delim(paste0(meta_dir, "DE_prior_hg.tsv"), stringsAsFactors = FALSE)
+pdeg_mm <- read.delim(paste0(meta_dir, "DE_prior_mm.tsv"), stringsAsFactors = FALSE)
 
+# Split meta by species
 meta_mm <- meta[meta$Species == "Mouse", ]
 meta_hg <- meta[meta$Species == "Human", ]
 
@@ -34,15 +35,14 @@ meta_hg <- meta[meta$Species == "Human", ]
 # Functions
 # ------------------------------------------------------------------------------
 
-
+# Filter df for var in top quantile (qtl)
 qtl_filter <- function(df, var, qtl = 0.9) {
-  # Filter df for var in top quantile (qtl)
   filter(df, !!sym(var) >= quantile(!!sym(var), qtl, na.rm = TRUE))
 }
 
 
+# Heuristic - remove genes in the top quantile (qtl) of count NAs
 na_filter <- function(df, qtl = 0.25) {
-  # Heuristic - remove genes in the top quantile (qtl) of count NAs
   filter(df, Count_NA <= quantile(df$Count_NA, qtl))
 }
 
@@ -312,8 +312,8 @@ plot(context_df$Exp1, context_df$Exp2)
 
 
 # Save out
-saveRDS(all_de, file = paste0(out_dir, "all_FDR=", fdr, "_counts_list_", date, ".RDS"))
-saveRDS(tf_de, file = paste0(out_dir, "TF_FDR=", fdr, "_counts_list_", date, ".RDS"))
+saveRDS(all_de, file = paste0(expr_dir, "all_FDR=", fdr, "_counts_list_", date, ".RDS"))
+saveRDS(tf_de, file = paste0(expr_dir, "TF_FDR=", fdr, "_counts_list_", date, ".RDS"))
 
 
 # Plots

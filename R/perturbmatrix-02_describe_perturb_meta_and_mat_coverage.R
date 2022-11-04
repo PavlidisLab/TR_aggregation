@@ -9,10 +9,9 @@ library(RColorBrewer)
 source("R/setup-01_config.R")
 source("R/utils/plot_functions.R")
 
-date <- "Apr2022"  # latest data freeze
-pmat_dir <- "~/Data/Expression_files/Perturb_matrix/"
 plot_dir <- paste0(pplot_dir, "Meta_sample_matrix/")
 
+# Load meta and lists of perturb effect size matrices
 meta <- read.delim(file =  paste0(meta_dir, "batch1_tfperturb_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
 mlist_hg <- readRDS(paste0(pmat_dir, "human_list_perturb_matrix_", date, ".RDS"))
 mlist_mm <- readRDS(paste0(pmat_dir, "mouse_list_perturb_matrix_", date, ".RDS"))

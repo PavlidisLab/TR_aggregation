@@ -9,21 +9,21 @@ library(pheatmap)
 library(cowplot)
 library(RColorBrewer)
 library(WGCNA)
-source("~/regnetR/R/utils/similarity_functions.R")
-source("~/regnetR/R/utils/plot_functions.R")
+source("R/setup-01_config.R")
+source("R/utils/similarity_functions.R")
+source("R/utils/plot_functions.R")
 
 topn <- 500 # how many of the top genes to keep
 common_arg <- TRUE  # should comparison only be done for mutually measured genes?
 date <- "Apr2022"  # most recent data freeze
-outfile <- paste0("~/scratch/R_objects/", date, "_perturb_similarity.RDS")
-plot_dir <- "~/Plots/TF_perturb/Experiment_similarity/"
+outfile <- paste0(scratch_dir, date, "_perturb_similarity.RDS")
+plot_dir <- paste0(pplot_dir, "/Experiment_similarity/")
 
-# Load perturbation data
-perturb_dir <- "~/Data/Expression_files/Perturb_matrix/"
-meta <- read.delim(file =  paste0("~/Data/Metadata/Gemma/batch1_tfperturb_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
-mlist_hg <- readRDS(paste0("~/Data/Expression_files/Perturb_matrix/human_list_perturb_matrix_", date, ".RDS"))
-mlist_mm <- readRDS(paste0("~/Data/Expression_files/Perturb_matrix/mouse_list_perturb_matrix_", date, ".RDS"))
-mlist_ortho <- readRDS(paste0("~/Data/Expression_files/Perturb_matrix/ortho_list_perturb_matrix_", date, ".RDS"))
+# Load meta and lists of perturb effect size matrices
+meta <- read.delim(file =  paste0(meta_dir, "batch1_tfperturb_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
+mlist_hg <- readRDS(paste0(pmat_dir, "human_list_perturb_matrix_", date, ".RDS"))
+mlist_mm <- readRDS(paste0(pmat_dir, "mouse_list_perturb_matrix_", date, ".RDS"))
+mlist_ortho <- readRDS(paste0(pmat_dir, "ortho_list_perturb_matrix_", date, ".RDS"))
 
 
 # General workflow is to generate exp x exp matrices where elements represent

@@ -4,23 +4,23 @@
 ## -----------------------------------------------------------------------------
 
 library(tidyverse)
-# library(gemmaAPI)
 library(cowplot)
 library(googlesheets4)
-source("~/regnetR/R/utils/gemma_functions.R")
-source("~/regnetR/R/utils/plot_functions.R")
+source("R/setup-01_config.R")
+source("R/utils/gemma_functions.R")
+source("R/utils/plot_functions.R")
 
-fdr <- 0.1  # fdr and FC cutoffs (FC for demonstration, not used in final analysis)
+
+# FDR and FC cutoffs (FC for demonstration, not used in final analysis)
+fdr <- 0.1  
 fc <- 1
 
-date <- "Apr2022"  # latest data freeze
-gsheets_id <- "1oXo1jfoPYcX94bq2F6Bqm1Es1glc8g9mnJvYAO37Vw4"  # for curating unexpected FC
-plot_dir <- "~/Plots/TF_perturb/Effect_size/"
-summary_dir <- "~/Data/TF_perturb/"
+plot_dir <- paste0(pplot_dir, "Effect_size/")
 
-meta <- read.delim(file =  paste0("~/Data/Metadata/Gemma/batch1_tfperturb_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
-results <- readRDS(paste0("~/Data/Expression_files/Gemma/TF_perturb_batch1_rslist_", date, ".RDS"))
-results_unfilt <- readRDS(paste0("~/Data/Expression_files/Gemma/TF_perturb_batch1_unfiltered_rslist_", date, ".RDS"))
+# Load meta and list of results +/- processing
+meta <- read.delim(file =  paste0(meta_dir, "batch1_tfperturb_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
+results <- readRDS(paste0(expr_dir, "TF_perturb_batch1_rslist_", date, ".RDS"))
+results_unfilt <-  readRDS(paste0(expr_dir, "TF_perturb_batch1_unfiltered_rslist_", date, ".RDS"))
 
 
 # Extract the rows corresponding to the perturbed TF of interest. Also consider
@@ -139,7 +139,7 @@ write.table(
   sep = "\t",
   quote = FALSE,
   row.names = FALSE,
-  file = paste0(summary_dir, date, "_perturbation_effect_sizes.tsv")
+  file = paste0(expr_dir, date, "_perturbation_effect_sizes.tsv")
 )
 
 
@@ -210,12 +210,12 @@ pert_df[which(pert_df$PercRankFC < 0.8 & abs(pert_df$FoldChange) >= 1), ]
 
 
 write_sheet(data = filter(unexpected_df, !Experiment_ID %in% multi_unexpected_df$Experiment_ID),
-            ss = gsheets_id,
+            ss = gsheets_perturb,
             sheet = paste0("Unexpected_single_probe_", date)
 )
 
 write_sheet(data = multi_unexpected_df,
-            ss = gsheets_id,
+            ss = gsheets_perturb,
             sheet = paste0("Unexpected_multi_probe_", date)
 )
 
