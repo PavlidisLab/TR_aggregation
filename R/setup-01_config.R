@@ -1,4 +1,5 @@
 ## This script establishes pathing of data and plots used throughout the project
+## TODO: consolidate expression dirs (and parts of scratch)
 
 
 
@@ -13,6 +14,13 @@ cores <- 8  # For use in parallel
 # Expression platform info from Nathaniel Lim
 platform_path <- "/space/grp/nlim/CronGemmaDump/AD_Dump.TSV"
 
+
+
+# Scratch location where outputs were variably saved
+# ------------------------------------------------------------------------------
+
+
+scratch_dir <- "/home/amorin/scratch/R_objects/"
 
 
 
@@ -58,5 +66,8 @@ expr_dir <- "/home/amorin/Data/Expression_files/Gemma/"
 # Where to save the perturb effect size matrices
 pmat_dir <- "/home/amorin/Data/Expression_files/Perturb_matrix/"
 
-# Top level of perturb files
+# Top level of perturb plot files
 pplot_dir <- "/home/amorin/Plots/TF_perturb/"
+
+
+# c("Meta_sample_matrix/", "Effect_size/", "Describe_FDR_counts/", "Experiment_similarity/")
