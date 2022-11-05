@@ -17,7 +17,7 @@ topn <- 500 # how many of the top genes to keep
 common_arg <- TRUE  # should comparison only be done for mutually measured genes?
 date <- "Apr2022"  # most recent data freeze
 outfile <- paste0(scratch_dir, date, "_perturb_similarity.RDS")
-plot_dir <- paste0(pplot_dir, "/Experiment_similarity/")
+plot_dir <- paste0(pplot_dir, "Experiment_similarity/")
 
 # Load meta and lists of perturb effect size matrices
 meta <- read.delim(file =  paste0(meta_dir, "batch1_tfperturb_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
@@ -237,42 +237,20 @@ cor_list <- lapply(cor_list, function(mat) {
 })
 
 
-# colours
-
-tf_pal = c(
-  Ascl1 = "#00188f",
-  Hes1 = "#fff100",
-  Mecp2 = "#009e49",
-  Mef2c = "#00bcf2",
-  Neurod1 = "#68217a",
-  Pax6 = "#ffd8b1",
-  Runx1 = "#e81123",
-  Tcf4 = "#ff8c00"
-)
 
 tf_colour = list(Symbol = tf_pal)
-# Species = c(Human = "royalblue", Mouse = "goldenrod")
-
-
-pal_length <- 100
-heatmap_pal <- colorRampPalette(c("#0571b0", "white", "#ca0020"))(pal_length)
 
 
 plot_heatmap <- function(mat, 
                          meta, 
                          file, 
                          col_min = -1, 
-                         col_max = 1,
-                         ortho = FALSE) {
+                         col_max = 1) {
   
   # Anno for colours
   anno <- meta %>% 
     mutate(Symbol = str_to_title(Symbol)) %>% 
-    # dplyr::select(Symbol, Species)
     dplyr::select(Symbol)
-  
-  # Because otherwise anno colour for single species
-  # if(!ortho) anno$Species <- NULL
   
   rownames(anno) <- rownames(mat)
   
@@ -291,7 +269,7 @@ plot_heatmap <- function(mat,
     show_colnames = FALSE,
     na_col = "white",
     border_color = "white",
-    color = heatmap_pal,
+    color = bluered_pal,
     breaks = color_breaks,
     annotation_row = anno,
     annotation_col = anno,
@@ -318,5 +296,4 @@ plot_heatmap(mat = cor_list$Human,
 
 plot_heatmap(mat = cor_list$Ortho, 
              meta = meta, 
-             ortho = TRUE,
              file = paste0(plot_dir, "cor_heatmap_ortho_", date, ".png"))

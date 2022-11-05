@@ -12,7 +12,7 @@ source("R/utils/plot_functions.R")
 
 fdr <- 0.1
 
-plot_dir <- paste0(pplot_dir, "/Describe_FDR_counts/")
+plot_dir <- paste0(pplot_dir, "Describe_FDR_counts/")
 
 # Load meta and lists of perturb effect size matrices
 meta <- read.delim(file =  paste0(meta_dir, "batch1_tfperturb_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
