@@ -11,8 +11,6 @@ library(GeneOverlap)
 library(plyr)
 library(dplyr)
 library(WGCNA)
-library(ggplot2)
-library(cowplot)
 
 
 mat_to_df <- function(mat, symmetric = TRUE) {
