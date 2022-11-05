@@ -1,22 +1,29 @@
-## This script organizes and saves two tables from the ENCODE pipeline qc2tsv output.
-## The first table cleans/organizes selected stats which are output by sample.
-## The second averages these stats for samples within a run, and adds additional
-## information about that run/experiment (count of peaks, number of samples) and
-## merges it with the curated metadata.
+## This script organizes and saves two tables from the ENCODE pipeline qc2tsv 
+## output.The first table cleans/organizes selected stats which are output by 
+## sample. The second averages these stats for samples within a run, and adds 
+## additional information about that run/experiment (count of peaks, number of 
+## samples) and merges it with the curated metadata.
 ## -----------------------------------------------------------------------------
 
 library(tidyverse)
+source("R/setup-01_config.R")
 
-date <- "Apr2022"  # latest update when metadata is saved out
-min_peaks <- 100 # Min peak filter for experiments used in analysis
+# The raw output of the qc2tsv tool
+qc_input <- paste0(pipeout_dir, "qc_reports/", date, "_chip_qc_report.tsv")
 
-qc_input <- paste0("~/enchip/qc_reports/", date, "_chip_qc_report.tsv")
+# Cleaned QC info for all samples
 qc_sample_output <- paste0("~/Data/Metadata/Chipseq/batch1_clean_sample_qc_", date, ".tsv")
+
+# Cleaned QC info at the experiment level (samples averaged)
 qc_run_output <- paste0("~/Data/Metadata/Chipseq/batch1_chip_meta_completed_withqc_", date, ".tsv")
+
+# The final metadata that includes completed experiments with their QC metrics
 meta_final_output <- paste0("~/Data/Metadata/Chipseq/batch1_chip_meta_final_", date, ".tsv")
 
+# The metadata tables before adding the QC metrics
 meta_all <- read.delim(paste0("~/Data/Metadata/Chipseq/batch1_chip_meta_all_", date, ".tsv"), stringsAsFactors = FALSE)
 meta_distinct <- read.delim(paste0("~/Data/Metadata/Chipseq/batch1_chip_meta_completed_runs_", date, ".tsv"), stringsAsFactors = FALSE)
+
 
 # Reminder - current imp doesn't auto run qc2tsv after chipmeta-04
 if (!file.exists(qc_input)) {
@@ -52,10 +59,10 @@ keep_cols <- c(
 stopifnot(all(keep_cols %in% colnames(qc)))
 
 
-fill_chr <- function(chr_vec) {
+# Helper to fill out a character vector with blanks - assumes that the blanks
+# should be filled with the last non blank character
 
-  # Helper to fill out a character vector with blanks - assumes that the blanks
-  # should be filled with the last non blank character
+fill_chr <- function(chr_vec) {
 
   if (chr_vec[1] == "") {
     stop("Can't fill if the first element is blank")
@@ -69,15 +76,15 @@ fill_chr <- function(chr_vec) {
       chr_vec[i] <- save_chr
     }
   }
-  return (chr_vec)
+  return(chr_vec)
 }
 
 
+# Fill out N IDR/Overlap peaks and reproducible peak status for all non-input
+# samples of a run (since only the first sample of a run has this info, and it
+# may get lost when splitting samples)
+
 fill_repr <- function(qc_df) {
-  
-  # Fill out N IDR/Overlap peaks and reproducible peak status for all non-input
-  # samples of a run (since only the first sample of a run has this info, and it
-  # may get lost when splitting samples)
   
   qc_list <- split(qc_df, qc_df$Experiment_ID)
   
@@ -95,11 +102,12 @@ fill_repr <- function(qc_df) {
 }
 
 
+
+# Given a qc df and the desired columns to keep, return a df of equal nrow
+# to qc_df and only with the requested columns, as well as the SRX ID,
+# Run title, and whether or not the sample is an input control
+
 organize_qc <- function(qc_df, keep_cols) {
-  
-  # Given a qc df and the desired columns to keep, return a df of equal nrow
-  # to qc_df and only with the requested columns, as well as the SRX ID,
-  # Run title, and whether or not the sample is an input control
   
   ids <- unlist(str_split(qc_df$description, ", "))
   ids <- ids[ids != ""]
@@ -126,7 +134,7 @@ organize_qc <- function(qc_df, keep_cols) {
     N_IDR_peaks = N_opt.1
   )
   
-  return (qc_df)
+  return(qc_df)
   
 }
 
@@ -257,6 +265,7 @@ qc_run <- Reduce(function(...) merge(..., by = "Experiment_ID", all.x = TRUE),
 
 # Save out copy of only experiments considered for analysis (passed IDR/overlap
 # and have more than min peaks)
+
 # NOTE: Uncertain why ENCODE pipeline will spit out IDR failure in the terminal
 # for most cases, but in others the run will complete and IDR failure is only
 # reflected in the QC report.
@@ -285,7 +294,6 @@ meta_final <- qc_run %>%
 
 
 # Save out
-
 
 write.table(qc_sub,
             sep = "\t",

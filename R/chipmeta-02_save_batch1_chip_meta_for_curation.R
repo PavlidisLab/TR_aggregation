@@ -8,21 +8,21 @@
 library(tidyverse)
 library(RCurl)
 library(googlesheets4)
+source("R/setup-01_config.R")
 
 date <- "aug2020"  # latest chip atlas metadata update
 date_old <- "dec2019"  # previous update, to isolate only new additions
-metadir <- "~/Data/Metadata/Chipseq/Chipatlas/"
-gsheets_id <- "1rGVnLL0eXHqr97GM1tloiWwwrJUUmj_ZjW5UOHFN1cc"
-outfile_all <- paste0(metadir, "batch1_chipmeta_tobecurated_all_", date, ".tsv")
-outfile_new <- paste0(metadir, "batch1_chipmeta_tobecurated_new_", date, ".tsv")
+meta_dir <- paste0(meta_dir, "/Chipseq/Chipatlas/")
+outfile_all <- paste0(meta_dir, "batch1_chipmeta_tobecurated_all_", date, ".tsv")
+outfile_new <- paste0(meta_dir, "batch1_chipmeta_tobecurated_new_", date, ".tsv")
 
-human_meta <- read.delim(paste0(metadir, "chipatlas_hg_tf_meta_", date, ".tsv"), stringsAsFactors = FALSE)
-mouse_meta <- read.delim(paste0(metadir, "chipatlas_mm_tf_meta_", date, ".tsv"), stringsAsFactors = FALSE)
-human_input_meta <- read.delim(paste0(metadir, "chipatlas_hg_input_meta_", date, ".tsv"), stringsAsFactors = FALSE)
-mouse_input_meta <- read.delim(paste0(metadir, "chipatlas_mm_input_meta_", date, ".tsv"), stringsAsFactors = FALSE)
+human_meta <- read.delim(paste0(meta_dir, "chipatlas_hg_tf_meta_", date, ".tsv"), stringsAsFactors = FALSE)
+mouse_meta <- read.delim(paste0(meta_dir, "chipatlas_mm_tf_meta_", date, ".tsv"), stringsAsFactors = FALSE)
+human_input_meta <- read.delim(paste0(meta_dir, "chipatlas_hg_input_meta_", date, ".tsv"), stringsAsFactors = FALSE)
+mouse_input_meta <- read.delim(paste0(meta_dir, "chipatlas_mm_input_meta_", date, ".tsv"), stringsAsFactors = FALSE)
 
 # load older metadata to filter for 'new' experiments only for curation
-old_meta <- read.delim(paste0(metadir, "batch1_chipmeta_tobecurated_all_", date_old, ".tsv"))
+old_meta <- read.delim(paste0(meta_dir, "batch1_chipmeta_tobecurated_all_", date_old, ".tsv"))
 
 get_gse <- function(gsm) {
   # Searches GEO to match a GSM sample ID to the GSE series
@@ -50,7 +50,7 @@ gsm <- str_extract_all(filter_meta$GEO_Title, "^GSM[0-9]+")
 # some entries have no GSM, or multiple due to curation errors. coerce to NA
 gsm <- unlist(lapply(gsm, function(x) {
   if (length(x) != 1) x <- NA 
-  return (x)
+  return(x)
 }))
 
 # get the GSE identifier from the GSM id. Slow!
@@ -91,7 +91,7 @@ match_input <- lapply(1:nrow(filter_meta_raw), function(x) {
   # return NA if no match, otherwise return all candidates input SRXs as well
   # as the corresponding GSM IDs
   if (length(match_ids) == 0) {
-    return (NA)
+    return(NA)
   } else {
     list(
       gsm = paste(str_extract_all(filter_input$GEO_Title, "GSM[:digit:]+"), collapse = ", "),
@@ -135,7 +135,7 @@ meta_new_only <- filter(filter_meta_raw, !(ID %in% old_meta$ID))
 
 sheet_write(
   data = filter_meta_raw,
-  ss = gsheets_id,
+  ss = gsheets_chip,
   sheet = paste0("Raw_Batch1_all_", date)
 )
 
@@ -151,7 +151,7 @@ write.table(
 
 sheet_write(
   data = meta_new_only,
-  ss = gsheets_id,
+  ss = gsheets_chip,
   sheet = paste0("Raw_Batch1_newonly_", date)
 )
 

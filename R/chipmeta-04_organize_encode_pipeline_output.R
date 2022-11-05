@@ -1,7 +1,7 @@
 ## This script does the following:
 ## 1) Load curated ChIP-seq metadata from Gsheets
 ## 2) Subsets metadata for completed runs and unique Run title/experiment IDs
-## 3) Assocaties the cryptically named ENCODE pipeline output dirs to each run
+## 3) Associates the cryptically named ENCODE pipeline output dirs to each run
 ## 4) Ensures that each run has expected output and pipeline meta matches curated meta
 ## 5) Saves out table of completed runs for curating GEO groups in Gsheets, reads curated back in
 ## 6) Save all tables locally
@@ -10,25 +10,39 @@
 library(tidyverse)
 library(googlesheets4)
 library(rjson)
+source("R/setup-01_config.R")
 
-date <- "Apr2022"  # latest update when metadata is saved out
-gsheets_id <- "1rGVnLL0eXHqr97GM1tloiWwwrJUUmj_ZjW5UOHFN1cc"  # master meta id
+# the root dir where the output of the pipeline lives
+chip_dir <- paste0(pipeout_dir, "chip/")
 
-pipeline_dir <- "/cosmos/data/pipeline-output/chipseq-encode-pipeline/chip"
-run_dir_output <- paste0("~/Data/Metadata/Chipseq/batch1_run_dirs_", date, ".tsv")
-meta_all_output <- paste0("~/Data/Metadata/Chipseq/batch1_chip_meta_all_", date, ".tsv")
-meta_distinct_output <- paste0("~/Data/Metadata/Chipseq/batch1_chip_meta_completed_runs_", date, ".tsv")
-geo_group_output <- paste0("~/Data/Metadata/Chipseq/batch1_chip_geo_groups_", date, ".tsv")
-qc_file_output <- paste0("/cosmos/data/pipeline-output/chipseq-encode-pipeline/qc_reports/batch1_qcfiles_", date, ".txt")
+# Output paths of the various tables that are generated:
+
+# table that links qc.jsons to experiment IDs for input to the qc2tsv tool
+qc_out <- paste0(pipeout_dir, "qc_reports/batch1_qcfiles_", date, ".txt")
+
+# table associating experiment IDs to its corresponding output directory
+run_dir_output <- paste0(meta_dir, "Chipseq/batch1_run_dirs_", date, ".tsv")
+
+# output metadata of all processed ChIP-seq samples
+meta_all_output <- paste0(meta_dir, "Chipseq/batch1_chip_meta_all_", date, ".tsv")
+
+# output metadata of all processed ChIP-seq experiments
+meta_distinct_output <- paste0(meta_dir, "Chipseq/batch1_chip_meta_completed_runs_", date, ".tsv")
+
+# Output of curated GEO/lab groups for each ChIP-seq experiment
+geo_group_output <- paste0(meta_dir, "Chipseq/batch1_chip_geo_groups_", date, ".tsv")
 
 
 # Load and clean metadata
+# MECP2 samples were run on both the TF and the histone pipelines. This involved
+# separating their metadata tracking sheets. Ultimately used MECP2 histone
+# for analysis, so combine and only keep MECP2 histone runs.
 # ------------------------------------------------------------------------------
 
 
 # Load gsheets of the curated metadata
 meta <- read_sheet(
-  ss = gsheets_id,
+  ss = gsheets_chip,
   sheet = "Master_batch1",
   trim_ws = TRUE,
   col_types = "c"
@@ -36,7 +50,7 @@ meta <- read_sheet(
 
 # mecp2 samples that were run in the histone mode of the pipeline
 meta_mh <- read_sheet(
-  ss = gsheets_id,
+  ss = gsheets_chip,
   sheet = "Mecp2_histone",
   trim_ws = TRUE,
   col_types = "c"
@@ -45,6 +59,7 @@ meta_mh <- read_sheet(
 # Coerce chr "NA" to actual NAs (needed for NA detection)
 meta[meta == "NA"] <- NA
 meta_mh[meta_mh == "NA"] <- NA
+
 
 # Combine and create subsets: All experiments; Keeping only completed experiments
 # with Mecp2 from the histone pipeline (used in analysis); Distinct meta so 
@@ -128,7 +143,7 @@ get_run_info <- function(dir) {
   
   # End if no metadata found
   if (!file.exists(paste0(dir, "/metadata.json"))) {
-    return (df)
+    return(df)
   }
   
   # load metadata and extract run title
@@ -156,7 +171,7 @@ get_run_info <- function(dir) {
 
 
 # Get the dirs from the ChIP-seq output dir
-chip_dirs <- list.dirs(pipeline_dir, recursive = FALSE)
+chip_dirs <- list.dirs(chip_dir, recursive = FALSE)
 
 # Get the df of runs, dir, and status checks
 run_info <- do.call(rbind, lapply(chip_dirs, get_run_info))
@@ -173,6 +188,7 @@ run_info <- run_info %>%
 
 # Inspect/check the output to ensure everything is accounted for
 # ------------------------------------------------------------------------------
+
 
 # check for when no metadata was found - suggests failed run to be removed
 stopifnot(nrow(run_info[which(is.na(run_info$Experiment_ID)), ]) == 0)
@@ -210,7 +226,7 @@ stopifnot(nrow(meta_all[which(input_per_run$Count_input > 1), ]) == 0)
 
 
 # Is QC missing? NOTE: A qc.json will not be generated if IDR fails, even if
-# peak overlap is successful, so this isn't useful
+# peak overlap is successful, so turns out this isn't useful. Keep as reminder
 # view(run_info[!run_info$QC, ])
 
 
@@ -252,11 +268,11 @@ geo_dup <- meta_distinct %>%
   dplyr::mutate(Duplicated = duplicated(GSE),
                 GEO_Group = NA)
 
-write_sheet(geo_dup, ss = gsheets_id, sheet = paste0("GEO_groups_", date))
+write_sheet(geo_dup, ss = gsheets_chip, sheet = paste0("GEO_groups_", date))
 
 
 geo_dup_cur <- read_sheet(
-  ss = gsheets_id,
+  ss = gsheets_chip,
   sheet = paste0("GEO_groups_curated_", date),
   trim_ws = TRUE,
   col_types = "c"
@@ -313,5 +329,5 @@ write.table(
   row.names = FALSE,
   col.names = FALSE,
   sep = "\t",
-  file = qc_file_output
+  file = qc_out
 )

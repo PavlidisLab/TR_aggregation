@@ -2,17 +2,18 @@
 ## sheet. Only want to keep TF data sets in mouse and human. The downloaded table
 ## then undergoes additional manual curation to verify details, match inputs, and
 ## add additional experiments from other databases.
-
-## Be aware of date of latest update! https://github.com/inutano/chip-atlas/wiki
-## Last update: August 2020 (checked May2022, still same)
 ## -----------------------------------------------------------------------------
 
 library(tidyverse)
+source("R/setup-01_config.R")
 
+# Be aware of date of latest update! https://github.com/inutano/chip-atlas/wiki
+# Last update: August 2020 (checked May2022, still same)
 date <- "aug2020"
 
+
 meta_name <- paste0("chipatlas_all_meta_", date, ".tsv")
-outdir <- "~/Data/Metadata/Chipseq/Chipatlas/"
+outdir <- paste0(meta_dir, "Chipseq/Chipatlas/")
 meta_path <- paste0(outdir, meta_name)
 url <- "http://dbarchive.biosciencedbc.jp/kyushu-u/metadata/experimentList.tab"
 
@@ -38,7 +39,7 @@ all_meta <- read.delim(
   stringsAsFactors = FALSE
 )
 
-dim (all_meta) # aug2020: 439593    131
+dim(all_meta) # aug2020: 439593    131
 
 # only want mouse and human for input and TF ChIP experiments
 

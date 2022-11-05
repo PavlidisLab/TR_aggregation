@@ -7,16 +7,18 @@
 
 library(tidyverse)
 library(googlesheets4)
+source("R/setup-01_config.R")
 
-gsheets_id <- "1rGVnLL0eXHqr97GM1tloiWwwrJUUmj_ZjW5UOHFN1cc"
+# This is where text files organizing experiments for encode pipeline are saved
+exp_out <- paste0(encode_dir, "inputs/")
 
-output_dir <- "~/Projects/encode-pipeline/inputs/"
-fastq_dir <- "~/dlchip/inputs/"  # as in pipeline input, not ChIP control!
+# This is where text files organizing samples->fastqs are saved
+fastq_out <- paste0(fastq_dir, "inputs/")
 
 # Load the up to date curated metadata sheet
 
 pipeline_meta <- read_sheet(
-  ss = gsheets_id,
+  ss = gsheets_chip,
   sheet = "Master_batch1",
   trim_ws = TRUE,
   col_types = "c"
@@ -111,7 +113,7 @@ pipeline_runs <- unique(pipeline_meta$Experiment_ID)
 
 for (run in pipeline_runs) {
   
-  out_file = paste0(output_dir, run, ".tsv")
+  out_file = paste0(exp_out, run, ".tsv")
   
   if (!file.exists(out_file)) {
     

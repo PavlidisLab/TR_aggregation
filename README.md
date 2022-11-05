@@ -21,11 +21,40 @@ information is required.
 ### chipmeta-
 These scripts collect metadata from the Chip Atlas database for further curation
 so that the underlying samples (fastq files) can be downloaded and submitted
-to the ENCODE pipeline. Information of the resulting experiments are then
-organized and plotted.
+to the ENCODE pipeline. Information from the resulting pipeline outputs are then
+organized/consolidated with the master metadata. 
+NOTE: Ideally the processes of meta org, fastq download, pipeline submission, qc
+organization etc would be more modular with the ENCODE pipeline for ease of
+adapting to other experiments. However, figuring this process out was entwined 
+with this project/paper and the associated ChIP-seq metadata, so I'm keeping the 
+"logic" laid out as executed.
 
 ```
-01_download_and_process_chipatlas_metadata.R : 
+01_download_and_process_chipatlas_metadata.R : Download latest metadata of all
+ChIP-seq experiments on Chip Atlas and isolate TF ChIP-seq
+
+02_save_batch1_chip_meta_for_curation.R : Only keep TFs of interest for export
+for human curation in gsheets.
+
+03_save_curated_input_for_encode_pipeline.R : This is a rather hacky script that
+takes the curated ChIP-seq metadata, and exports text tables of fastq files to
+download, and another text table for sample->experiment structure for input to
+the ENCODE pipeline. 
+
+04_organize_encode_pipeline_output.R : This associates experiment IDs with the
+respective output dir from the ENCODE pipeline, checks that the expected samples
+in the metadata.json produced by the pipeline match master metadata samples for
+that experiment, subsets meta to successfully ran experiments, and organizes
+the location of qc.json files produced for each experiment for input to the 
+qc2tsv tool.
+
+05_organize_encode_pipeline_qc.R : Takes the output of the qc2tsv tool and 
+further processes. Also averages sample QC within experiments to get an 
+experiment level summary. This information is than appended to create the final
+metadata.
+
+06_describe_metadata_and_qc.R : Gives overview statistics of the assembled
+ChIP-seq experiments and saves out plots.
 ```
 
 ### chipmatrix-

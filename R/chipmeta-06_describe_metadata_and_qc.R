@@ -4,17 +4,16 @@
 
 library(tidyverse)
 library(cowplot)
-source("~/regnetR/R/utils/plot_functions.R")
+source("R/setup-01_config.R")
+source("R/utils/plot_functions.R")
 
-date <- "Apr2022"  # latest update when metadata is saved out
-min_peaks <- 100 # Min peak filter for experiments used in analysis
-plot_dir <- "~/Plots/Chipseq/Describe_meta/"
+plot_dir <- paste0(cplot_dir, "Describe_meta/")
 
 # meta final is what is used for analysis - filtered for min peaks and passing IDR/overlap
 # meta runs is all completed runs (including those under min peak) - used for plotting
-meta_final <- read.delim(paste0("~/Data/Metadata/Chipseq/batch1_chip_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
-meta_runs <- read.delim(paste0("~/Data/Metadata/Chipseq/batch1_chip_meta_completed_withqc_", date, ".tsv"), stringsAsFactors = FALSE)
-meta_all <- read.delim(paste0("~/Data/Metadata/Chipseq/batch1_chip_meta_all_", date, ".tsv"), stringsAsFactors = FALSE)
+meta_final <- read.delim(paste0(meta_dir, "Chipseq/batch1_chip_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
+meta_runs <- read.delim(paste0(meta_dir, "Chipseq/batch1_chip_meta_completed_withqc_", date, ".tsv"), stringsAsFactors = FALSE)
+meta_all <- read.delim(paste0(meta_dir, "Chipseq/batch1_chip_meta_all_", date, ".tsv"), stringsAsFactors = FALSE)
 
 
 # Describe metadata
@@ -157,10 +156,10 @@ p1 <- n_samps_species %>%
   theme(axis.title.x = element_blank(),
         axis.title.y = element_text(size = 30),
         axis.text.y = element_text(size = 30),
-        axis.text.x = element_text(size = 30, angle = 60, vjust = 1, hjust=1),
-        legend.text = element_text(size=15),
-        legend.title = element_text(size=15),
-        legend.position="bottom")
+        axis.text.x = element_text(size = 30, angle = 60, vjust = 1, hjust = 1),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 15),
+        legend.position = "bottom")
 
 
 ggsave(p1,
@@ -186,10 +185,31 @@ p2 <- meta_final %>%
   theme(axis.title.x = element_blank(),
         axis.title.y = element_text(size = 30),
         axis.text.y = element_text(size = 30),
-        axis.text.x = element_text(size = 30, angle = 60, vjust = 1, hjust=1),
-        legend.text = element_text(size=15),
-        legend.title = element_text(size=15),
-        legend.position="bottom")
+        axis.text.x = element_text(size = 30, angle = 60, vjust = 1, hjust = 1),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 15),
+        legend.position = "bottom")
+
+
+
+p2 <- meta_final %>%
+  dplyr::mutate(Symbol = str_to_title(Symbol)) %>%
+  distinct(Experiment_ID, .keep_all = TRUE) %>%
+  count(Symbol, Species) %>%
+  ggplot(., aes(y = reorder(Symbol, n), x = n, fill = Species)) +
+  geom_bar(stat = "identity", colour = "black", width = 0.8) +
+  xlab("Count of experiments") +
+  scale_x_continuous(limits = c(0, 150), breaks = seq(0, 150, 15)) +
+  theme_classic() +
+  scale_fill_manual(values = c("royalblue", "goldenrod")) +
+  theme(axis.title.y = element_blank(),
+        axis.title.x = element_text(size = 30),
+        axis.text.y = element_text(size = 30),
+        axis.text.x = element_text(size = 30, angle = 60, vjust = 1, hjust = 1),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 15),
+        legend.position = "bottom")
+
 
 
 ggsave(p2,
