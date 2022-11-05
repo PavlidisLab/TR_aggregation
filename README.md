@@ -19,9 +19,13 @@ information is required.
 
 
 ### chipmeta-
+These scripts collect metadata from the Chip Atlas database for further curation
+so that the underlying samples (fastq files) can be downloaded and submitted
+to the ENCODE pipeline. Information of the resulting experiments are then
+organized and plotted.
 
 ```
-01
+01_download_and_process_chipatlas_metadata.R : 
 ```
 
 ### chipmatrix-
@@ -56,13 +60,33 @@ experiments that need to be curated/paired to a resultset ID, and saves hard
 copy of metadata
 
 02_save_tfperturb_rds.R : Reads curated table that matches resultset IDs to 
-experiments. Loads, processes, and saves these experiments to an RDS object
+experiments. Loads, processes, and saves these experiments to a list RDS object
 ```
 
 ### perturbmatrix-
+These scripts construct effect size matrices for analysis from the list of
+perturbation experiments 
 
 ```
-01
+01_save_perturb_effect_size_matrices.R : Create tstat/fc/pval/fdr matrices for
+human and mouse experiments, as well as combined matrix of ortho genes
+
+02_describe_perturb_meta_and_mat_coverage.R : Gives overview statistics of the
+assembled perturbation data and saves plots of features like gene coverage
+
+03_describe_perturb_effect_sizes.R : Gives overview statistics and creates plots
+of features like the relationship between the FCmagnitude of the perturbed TR 
+and the count of DEGs
+
+04_describe_and_save_FDR_counts.R : This arguably overstuffed script generates
+information about features like the count of times a gene was DE and the 
+consistency of the change of direction. This information is organized as lists
+and exported out for later downstream analysis. In addition, this script provides
+an overview and plots for the generated statistics.
+
+05_perturb_experiment_similarity: Generates the pearson correlation of fold
+changes between experiments as well as various metrics of the top n overlap
+of genes. Summarizes in-versus-out by TR groups.
 ```
 
 ### intersect-
