@@ -1,4 +1,5 @@
-## Explore overlap of ChIP-seq GR objects among all and TF-specific experiments
+## Explore overlap of ChIP-seq GR objects within and between TR groups. Create
+## a reduced and re-sized GR object for export.
 ## TODO: clean up top/count/frac mat helpers
 ## TODO: formalize overlap of frequent with cCREs (current plot scheme highly inefficient)
 ## TODO: save logic of region tables
@@ -6,19 +7,21 @@
 
 library(tidyverse)
 library(GenomicRanges)
+library(parallel)
 library(ggbio)
-source("~/regnetR/R/utils/range_table_functions.R")
+source("R/setup-01_config.R")
+source("R/utils/range_table_functions.R")
 
-date <- "Apr2022"
-peakset <- "idr"
-plot_dir <- "~/Plots/Chipseq/GRanges/"
+window_size <- 150  # padding to add to either direction of peak summit
+plot_dir <- paste0(cplot_dir, "GRanges/")
 
 # GRanges objects
-gr_hg <- readRDS(paste0("~/Data/Annotated_objects/GRanges/human_batch1_grlist_peakset=", peakset, "_", date, ".RDS"))
-gr_mm <- readRDS(paste0("~/Data/Annotated_objects/GRanges/mouse_batch1_grlist_peakset=", peakset, "_", date, ".RDS"))
+gr_hg <- readRDS(paste0(gr_dir, "human_batch1_grlist_", date, ".RDS"))
+gr_mm <- readRDS(paste0(gr_dir, "mouse_batch1_grlist_", date, ".RDS"))
 
 # batch 1 ChIP-seq meta
 meta <- read.delim(paste0("~/Data/Metadata/Chipseq/batch1_chip_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
+
 stopifnot(all(meta$Experiment_ID %in% c(names(gr_hg), names(gr_mm))))
 
 meta_hg <- meta %>% 
@@ -42,22 +45,32 @@ stopifnot(identical(meta_mm$Experiment_ID, names(gr_mm)))
 # ------------------------------------------------------------------------------
 
 
+get_width_df <- function(gr_list, meta) {
+  
+  width_df <- data.frame(do.call(
+    rbind, lapply(gr_list, function(x) summary(width(x))))
+    ) %>% 
+    rownames_to_column(var = "Experiment_ID") %>%
+    left_join(meta[, c("Symbol", "Experiment_ID")], by = "Experiment_ID")
+  
+  rownames(width_df) <- meta$Experiment_ID
+  return(width_df)
+}
+
+
+
 # Human: GSE69394_NEUROD1_Human_H82 highest max peak size (123kb - 8:127638060-127761390)
 # which is stretch 5' of MYC that contains non protein coding CASC11
 # GSE58428_RUNX1_Human_VCaP highest mean peak size (1.67kb) - has high RSC
 
-peak_size_hg <- data.frame(
-  do.call(rbind, lapply(gr_hg, function(x) summary(width(x))))
-) %>%
-  rownames_to_column(var = "Experiment_ID") %>%
-  left_join(meta[, c("Symbol", "Experiment_ID")])
-rownames(peak_size_hg) <- peak_size_hg$Experiment_ID
+width_hg <- get_width_df(gr_hg, meta_hg)
 
-
-max_hg <- peak_size_hg[which.max(peak_size_hg$Max.),]
+max_hg <- width_hg[which.max(width_hg$Max.),]
 max_peak_hg <- gr_hg[rownames(max_hg)][width(gr_hg[rownames(max_hg)]) == max_hg$Max.]
-max_mean_hg <- peak_size_hg[which.max(peak_size_hg$Mean),]
+
+max_mean_hg <- width_hg[which.max(width_hg$Mean),]
 meta[meta$Experiment_ID %in% c(rownames(max_mean_hg), names(max_peak_hg)), ]
+
 
 
 # Mouse: Largest max peak size GSE90893_Runx1_Mouse_MEF-Control
@@ -65,61 +78,63 @@ meta[meta$Experiment_ID %in% c(rownames(max_mean_hg), names(max_peak_hg)), ]
 # Largest mean peak size belong to GSE126375_Runx1_Mouse_Pax5-KO (1.7kb)
 
 
-peak_size_mm <- data.frame(
-  do.call(rbind, lapply(gr_mm, function(x) summary(width(x))))
-) %>%
-  rownames_to_column(var = "Experiment_ID") %>%
-  left_join(meta[, c("Symbol", "Experiment_ID")])
-rownames(peak_size_mm) <- peak_size_mm$Experiment_ID
+width_mm <- get_width_df(gr_mm, meta_mm)
 
-
-max_mm <- peak_size_mm[which.max(peak_size_mm$Max.),]
+max_mm <- width_mm[which.max(width_mm$Max.),]
 max_peak_mm <- gr_mm[rownames(max_mm)][width(gr_mm[rownames(max_mm)]) == max_mm$Max.]
-max_mean_mm <- peak_size_mm[which.max(peak_size_mm$Mean),]
+
+max_mean_mm <- width_mm[which.max(width_mm$Mean),]
 meta[meta$Experiment_ID %in% c(rownames(max_mean_mm), names(max_peak_mm)), ]
 
 
 # Look at how many peaks overlap within data sets before fixing size.
-# Find no intra-peak overlaps (which is expected based on pipeline output).
-# Closest peaks across all datasets is 33bp for both human and mouse, all in
-# Runx1 experiments
 # ------------------------------------------------------------------------------
 
 
-any_overlaps_hg <- vapply(gr_hg, function(gr) {
-  return (length(gr) == length(reduce(gr)))
-}, FUN.VALUE = logical(1))
+# Check if reduced set (collapses overlapping peaks) is same length as original
 
-stopifnot(all(any_overlaps_hg))
+any_overlaps <- function(gr_list) {
+  
+  vapply(gr_list, function(gr) {
+    return(length(gr) == length(reduce(gr)))
+  }, FUN.VALUE = logical(1))
 
-
-any_overlaps_mm <- vapply(gr_mm, function(gr) {
-  return (length(gr) == length(reduce(gr)))
-}, FUN.VALUE = logical(1))
-
-stopifnot(all(any_overlaps_mm))
+}
 
 
-nearest_dist_hg <- unlist(mclapply(gr_hg, function(x) {
-  min(distanceToNearest(x)@elementMetadata$distance)
-}, mc.cores = 8))
+# Find no intra-peak overlaps (which is expected based on pipeline output).
+
+stopifnot(all(any_overlaps(gr_hg)))
+stopifnot(all(any_overlaps(gr_mm)))
 
 
-nearest_dist_mm <- unlist(mclapply(gr_mm, function(x) {
-  min(distanceToNearest(x)@elementMetadata$distance)
-}, mc.cores = 8))
+# For each data set, find the smallest distance between peaks
 
 
-nearest_dist_hg[nearest_dist_hg == min(nearest_dist_hg)]
-nearest_dist_mm[nearest_dist_mm == min(nearest_dist_mm)]
+nearest_dist <- function(gr_list, cores) {
+  
+  unlist(mclapply(gr_list, function(x) {
+    min(distanceToNearest(x)@elementMetadata$distance)
+  }, mc.cores = cores))
+  
+}
+
+
+# Closest peaks across all datasets is 33bp for both human and mouse, all in
+# Runx1 experiments
+
+nearest_hg <- nearest_dist(gr_hg, cores = cores)
+nearest_hg[nearest_hg == min(nearest_hg)]
+
+nearest_mm <- nearest_dist(gr_mm, cores = cores)
+nearest_mm[nearest_mm == min(nearest_mm)]
+
 
 
 # Because peaks have variable sizes, fix to summit position and add padding to
 # make all same size for overlap (1bp summit too stringent for overlap)
 # ------------------------------------------------------------------------------
 
-
-window_size <- 150
 
 summit_window <- function(gr, window_size) {
   # Fix range to the summit position and pad with a fixed window
