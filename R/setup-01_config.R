@@ -1,15 +1,32 @@
 ## This script establishes pathing of data and plots used throughout the project
 ## TODO: consolidate expression dirs (and parts of scratch)
+## TODO: collapsing meta paths/subdirs? (eg meta/chipseq/atlas append)
+## TODO: schematic of ChIP-seq workflow
+## TODO: input for pipeline install and fastq download better organized
+
+
+# Variables of interest
+# ------------------------------------------------------------------------------
 
 
 
 date <- "Apr2022"  # Data freeze to use for analysis
 cores <- 8  # For use in parallel
+min_peaks <- 100  # Min peak filter for keeping ChIP-seq experiments
+
 
 
 # Hard-coded data paths on Pavlab
 # ------------------------------------------------------------------------------
 
+# ENCODE pipeline installation
+encode_dir <- "/home/amorin/Projects/encode-pipeline/"
+
+# Where downloaded fastq files live
+fastq_dir <- "/cosmos/data/downloaded-data/chipseq"
+
+# Where the ENCODE pipeline output lives
+pipeout_dir <-  "/cosmos/data/pipeline-output/chipseq-encode-pipeline/"
 
 # Expression platform info from Nathaniel Lim
 platform_path <- "/space/grp/nlim/CronGemmaDump/AD_Dump.TSV"
@@ -17,9 +34,6 @@ platform_path <- "/space/grp/nlim/CronGemmaDump/AD_Dump.TSV"
 
 
 # Scratch location where outputs were variably saved
-# ------------------------------------------------------------------------------
-
-
 scratch_dir <- "/home/amorin/scratch/R_objects/"
 
 
@@ -33,7 +47,8 @@ gsheets_perturb <- "1oXo1jfoPYcX94bq2F6Bqm1Es1glc8g9mnJvYAO37Vw4"
 
 
 # ChIP-seq metadata
-# gsheets_chip
+gsheets_chip <- "1rGVnLL0eXHqr97GM1tloiWwwrJUUmj_ZjW5UOHFN1cc"
+
 
 
 # Metadata and other genomic tables
@@ -42,6 +57,9 @@ gsheets_perturb <- "1oXo1jfoPYcX94bq2F6Bqm1Es1glc8g9mnJvYAO37Vw4"
 
 meta_dir <- "/home/amorin/Data/Metadata/"
 
+# ENCODE blacklists
+bl_path_hg <- "/home/amorin/Data/Chromosome_info/blacklist_hg38.tsv"
+bl_path_mm <- "/home/amorin/Data/Chromosome_info/blacklist_mm10.tsv"
 
 
 
@@ -50,7 +68,15 @@ meta_dir <- "/home/amorin/Data/Metadata/"
 # ------------------------------------------------------------------------------
 
 
+# ChIP-seq genomic range objects
+gr_dir <- "~/Data/Annotated_objects/GRanges/"
 
+
+# Top level of ChIP-seq plot files
+cplot_dir <- "/home/amorin/Plots/Chipseq/"
+
+
+# c("GRanges/")
 
 
 # Perturbation
