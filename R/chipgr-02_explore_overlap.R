@@ -1,8 +1,8 @@
 ## Explore overlap of ChIP-seq GR objects within and between TR groups. Create
-## a reduced and re-sized GR object for export.
-## TODO: clean up top/count/frac mat helpers
-## TODO: formalize overlap of frequent with cCREs (current plot scheme highly inefficient)
-## TODO: save logic of region tables
+## an "all" GR object that collapses peaks from every experiment, +/- resizing
+## peaks relative to summit and +/- reduction (collapsing overlapping peaks).
+## Also exports a matrix of these "all" regions and how many data sets from each
+## TR overlaps with these regions
 ## -----------------------------------------------------------------------------
 
 library(tidyverse)
@@ -13,14 +13,14 @@ source("R/setup-01_config.R")
 source("R/utils/range_table_functions.R")
 
 window_size <- 150  # padding to add to either direction of peak summit
-plot_dir <- paste0(cplot_dir, "GRanges/")
+outfile <- paste0(scratch_dir, date, "_count_mat_list.RDS")
 
 # GRanges objects
 gr_hg <- readRDS(paste0(gr_dir, "human_batch1_grlist_", date, ".RDS"))
 gr_mm <- readRDS(paste0(gr_dir, "mouse_batch1_grlist_", date, ".RDS"))
 
 # batch 1 ChIP-seq meta
-meta <- read.delim(paste0("~/Data/Metadata/Chipseq/batch1_chip_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
+meta <- read.delim(paste0(meta_dir, "Chipseq/batch1_chip_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
 
 stopifnot(all(meta$Experiment_ID %in% c(names(gr_hg), names(gr_mm))))
 
@@ -34,8 +34,6 @@ meta_mm <- meta %>%
   distinct(Experiment_ID, .keep_all = TRUE) %>% 
   arrange(match(Experiment_ID, names(gr_mm)))
 
-tfs_hg <- unique(meta_hg$Symbol)
-tfs_mm <- unique(meta_mm$Symbol)
 
 stopifnot(identical(meta_hg$Experiment_ID, names(gr_hg)))
 stopifnot(identical(meta_mm$Experiment_ID, names(gr_mm)))
@@ -48,8 +46,8 @@ stopifnot(identical(meta_mm$Experiment_ID, names(gr_mm)))
 get_width_df <- function(gr_list, meta) {
   
   width_df <- data.frame(do.call(
-    rbind, lapply(gr_list, function(x) summary(width(x))))
-    ) %>% 
+    rbind, lapply(gr_list, function(x) summary(width(x)))
+    )) %>% 
     rownames_to_column(var = "Experiment_ID") %>%
     left_join(meta[, c("Symbol", "Experiment_ID")], by = "Experiment_ID")
   
@@ -149,15 +147,19 @@ gr_rs_hg <- GRangesList(lapply(gr_hg, summit_window, window_size))
 gr_rs_mm <- GRangesList(lapply(gr_mm, summit_window, window_size))
 
 
+
 # Note that re-sizing 100bp+ results in overlapping peaks that were not
 # overlapping in their original forms. In the "reduced" set these re-sized
 # peaks are then merged, despite the fact that they originally represented two
 # summits from a single data set. Following was explored using
 # "GSE61197_ASCL1_Human_H1775-ASCL1-high"
+# ------------------------------------------------------------------------------
 
+
+
+# Make a standard Grange plot and add a line corresponding to the summit
 
 plot_gr_summit <- function(gr) {
-  # Make a standard Grange plot and add a line corresponding to the summit
   ggbio::autoplot(gr) + 
     geom_vline(xintercept = gr$Summit) +
     theme_clear()
@@ -178,7 +180,7 @@ length(test_gr_after) == length(reduce(test_gr_after))  # expect F
 
 # split the re-sized peak and find the indices corresponding to self overlaps
 self_overlap <- findOverlaps(
-  split(test_gr_after, rep(1:length(test_gr_after), each=1)), test_gr_after)
+  split(test_gr_after, rep(1:length(test_gr_after), each = 1)), test_gr_after)
 
 dup_ix <- unique(self_overlap@to[duplicated(self_overlap@to)])
 
@@ -196,8 +198,8 @@ p_after <- plot_gr_summit(self_dups_after[1:2])
 # plot that shows example of a large peak that originally does not overlap
 # but does so after re-sizing
 max_ix <- dup_ix[which.max(width(self_dups_before))]
-p_max_before <- plot_gr_summit(test_gr_before[(max_ix-1):max_ix])
-p_max_after <- plot_gr_summit(test_gr_after[(max_ix-1):max_ix])
+p_max_before <- plot_gr_summit(test_gr_before[(max_ix - 1):max_ix])
+p_max_after <- plot_gr_summit(test_gr_after[(max_ix - 1):max_ix])
 
 
 # Describe the full and reduced (non-overlapping) set of peaks for all 
@@ -208,7 +210,7 @@ p_max_after <- plot_gr_summit(test_gr_after[(max_ix-1):max_ix])
 # ------------------------------------------------------------------------------
 
 
-# Human: All and re-size ~3.5m peaks across 141 experiments which drops to ~1.22m
+# Human: All and re-size ~3.5m peaks across 129 experiments which drops to ~1.22m
 # in the re-sized and reduced set (-65%) and ~893k in the original reduced set (-75%)
 
 # The longest reduced peak in the original reduced set is 138kb 
@@ -224,7 +226,7 @@ all_hg <- list(
   Reduced_resize = reduce(unlist(gr_rs_hg))
 )
 
-count_hg <- sapply(all_hg, length)
+count_hg <- unlist(lapply(all_hg, length))
 change_hg <- (count_hg["Reduced"] - count_hg["All"]) / count_hg["All"]
 change_rs_hg <- (count_hg["Reduced_resize"] - count_hg["Resize"]) / count_hg["Resize"]
 
@@ -235,13 +237,13 @@ table(meta_hg$Symbol[unique(findOverlaps(maxpeak_hg, gr_hg)@to)])
 table(meta_hg$Symbol[unique(findOverlaps(maxpeak_rs_hg, gr_rs_hg)@to)])
 
 
-# Mouse: All and re-size ~1.95m peaks across 136 experiments which drops to ~686k
+# Mouse: All and re-size ~1.95m peaks across 126 experiments which drops to ~686k
 # in the re-sized and reduced set (-65%) and ~588k in the original reduced set (-70%)
 
 # The longest reduced peak in the original reduced set is 73kb 
-# (1: 71582211-71655460 ) which overlaps peaks in 36 data sets.
+# (1: 71582211-71655460) which overlaps peaks in 33 data sets.
 # The longest in the re-sized reduced set is 3.3kb (7: 127024978-127028247)
-# in 57 data sets
+# in 56 data sets
 
 
 all_mm <- list(
@@ -266,8 +268,10 @@ table(meta_mm$Symbol[unique(findOverlaps(maxpeak_rs_mm, gr_rs_mm)@to)])
 # ------------------------------------------------------------------------------
 
 
+# all_gr is a single gr of all experiments, exp_gr are the same experiments
+# grouped in a list. 
+
 all_overlap <- function(all_gr, exp_gr, meta) {
-  # all_gr is a single gr, exp_gr is a gr list of experiments
   
   ol <- findOverlaps(all_gr, exp_gr)
   counts <- table(ol@from)
@@ -285,8 +289,12 @@ all_overlap <- function(all_gr, exp_gr, meta) {
 
 
 # Human: 
-# Most overlapping regions 16:85604925-85645912, 11: 65496125-65508279, and
-# 19: 44753325-44753587
+# Most frequently overlapped regions 
+# Original/All - 11: 65496125-65509326 (13 kbp) overlapped in 94 data sets
+# Resize - 19:44753276-44753763 (488 bp) overlapped in 90 data sets
+# Reduced - 16:85604925-85645912 (41 kb) overlapped in 96 data sets
+# Reduced resize - 19:44753276-44753763 (488 bp) overlapped in 90 data sets
+
 
 all_ol_hg <- list(
   All = all_overlap(all_hg$All, gr_hg, meta_hg),
@@ -296,12 +304,19 @@ all_ol_hg <- list(
 )
 
 lapply(all_ol_hg, `[[`, "Most_overlapped")
+lapply(all_ol_hg, `[[`, "Most_overlapped_TF")
 lapply(all_ol_hg, `[[`, "Count_exp_most_overlapped")
 lapply(all_ol_hg, `[[`, "Most_overlapped_width")
 
 
 # Mouse: 
-# Most overlapping regions 3:88509241-88512113
+# Most frequently overlapped regions 
+# Original/All - 3: 88507136-88515082 (8 kbp) overlapped in 82 data sets
+# Resize - 3: 88509931-88510302 (372 bp) overlapped in 79 data sets
+# Reduced - 3: 88507004-88515082 (8 kb) overlapped in 82 data sets
+# Reduced resize - 3: 88509708-88510703 (996 bp) overlapped in 79 data sets
+
+
 
 all_ol_mm <- list(
   All = all_overlap(all_mm$All, gr_mm, meta_mm),
@@ -311,35 +326,40 @@ all_ol_mm <- list(
 )
 
 lapply(all_ol_mm, `[[`, "Most_overlapped")
+lapply(all_ol_mm, `[[`, "Most_overlapped_TF")
 lapply(all_ol_mm, `[[`, "Count_exp_most_overlapped")
 lapply(all_ol_mm, `[[`, "Most_overlapped_width")
+
 
 
 # Create TF-specific all and reduced GR objects
 # ------------------------------------------------------------------------------
 
 
-gr_by_tf <- function(tfs, exp_gr, meta) {
-  # Grlist of experiments grouped into list by TF
+gr_by_tf <- function(gr_list, meta) {
+  
+  tfs <- unique(meta$Symbol)
+  
   tf_gr <- lapply(tfs, function(tf) {
     runs <- meta[meta$Symbol == tf, "Experiment_ID"]
-    unlist(exp_gr[runs])
+    unlist(gr_list[runs])
   })
   names(tf_gr) <- tfs
+  
   return(tf_gr)
 }
 
 
 tf_gr_hg <- list(
-  All = gr_by_tf(tfs_hg, gr_hg, meta_hg),
-  Resize = gr_by_tf(tfs_hg, gr_rs_hg, meta_hg))
+  All = gr_by_tf(gr_hg, meta_hg),
+  Resize = gr_by_tf(gr_rs_hg, meta_hg))
 tf_gr_hg$Reduced <- lapply(tf_gr_hg$All, reduce)
 tf_gr_hg$Reduced_resize <- lapply(tf_gr_hg$Resize, reduce)
 
 
 tf_gr_mm <- list(
-  All = gr_by_tf(tfs_mm, gr_mm, meta_mm),
-  Resize = gr_by_tf(tfs_mm, gr_rs_mm, meta_mm))
+  All = gr_by_tf(gr_mm, meta_mm),
+  Resize = gr_by_tf(gr_rs_mm, meta_mm))
 tf_gr_mm$Reduced <- lapply(tf_gr_mm$All, reduce)
 tf_gr_mm$Reduced_resize <- lapply(tf_gr_mm$Resize, reduce)
 
@@ -351,296 +371,97 @@ tf_gr_mm$Reduced_resize <- lapply(tf_gr_mm$Resize, reduce)
 # ------------------------------------------------------------------------------
 
 
+tf_count_df <- function(tf_gr_list) {
+  data.frame(
+    do.call(
+      cbind, lapply(tf_gr_list, function(x) unlist(lapply(x, length)))
+    )
+  )
+}
+
+
+count_change <- function(count_df) {
+  data.frame(
+    Symbol = rownames(count_df),
+    Reduced = (count_df[, "Reduced"] - count_df[, "All"]) / count_df[, "All"],
+    Reduced_resize = (count_df[, "Reduced_resize"] - count_df[, "Resize"]) / count_df[, "Resize"]
+  )
+}
+
+
+
 # Human: RUNX1 most reduced size, HES1 least
 
-tf_counts_hg <- sapply(tf_gr_hg, function(peakset) sapply(peakset, function(tf) length(tf)))
-change_hg <- (tf_counts_hg[, "Reduced"] - tf_counts_hg[, "All"]) / tf_counts_hg[, "All"]
-change_rs_hg <- (tf_counts_hg[, "Reduced_resize"] - tf_counts_hg[, "Resize"]) / tf_counts_hg[, "Resize"]
+tf_count_hg <- tf_count_df(tf_gr_hg)
+tf_change_hg <- count_change(tf_count_hg)
 
-# Mouse: Runx1 most reduced size, Mecp2 least
+# Mouse: Runx1 most reduced size, Mecp2 least (Tcf4 only has 1 data set)
 
-tf_counts_mm <- sapply(tf_gr_mm, function(peakset) sapply(peakset, function(tf) length(tf)))
-change_mm <- (tf_counts_mm[, "Reduced"] - tf_counts_mm[, "All"]) / tf_counts_mm[, "All"]
-change_rs_mm <- (tf_counts_mm[, "Reduced_resize"] - tf_counts_mm[, "Resize"]) / tf_counts_mm[, "Resize"]
+tf_count_mm <- tf_count_df(tf_gr_mm)
+tf_change_mm <- count_change(tf_count_mm)
+
 
 
 # Get the count of TF data sets that each range overlaps. Arrange by counts 
 # for each TF while minimizing sum of counts for the other TFs. Suggestive of
 # TF-specific binding sites
-# NOTE: exploration does on reduced, re-sized
 # ------------------------------------------------------------------------------
 
 
-get_count_mat <- function(gr_query, gr_subject, meta, tfs) {
-  # Return a matrix with nrow = length of gr_query and ncol equal to length
-  # of TFs. each row corresponds to a peak in gr_query and elements are the 
-  # number of TF data sets from gr_subject that the peak overlaps
+# Return a matrix where rows are every region of all_gr (all ChIP-seq experiments
+# as one GRange object), and columns are the unique TRs in meta. Each element
+# of this matrix is the number of experiments for the given TR that had a peak
+# overlapping the given range.
+
+
+get_count_mat <- function(all_gr, gr_list, meta, cores) {
   
-  # get the indices of the subject hits
-  gr_ol <- findOverlaps(gr_query, gr_subject)
+  # find which data sets of gr_list each range of all_gr overlaps
+  gr_ol <- findOverlaps(all_gr, gr_list)
   ol_by_ix <- as(gr_ol, "List")
   
-  # get the corresponding TF symbol of the subject and count
+  # get the corresponding TF symbol of the overlapping hit
   ol_by_tf <- extractList(meta$Symbol, ol_by_ix)
+  
+  # counts to table - as factor to maintain tally of TFs with 0 counts
   ol_by_count <- mclapply(ol_by_tf, function(x) {
     table(factor(x, levels = tfs))
-  }, mc.cores = 8)
+  }, mc.cores = cores)
   
   # return the matrix of counts with rows named after the range
   count_mat <- as.matrix(do.call(rbind, ol_by_count))
-  rownames(count_mat) <- 
-    paste0(seqnames(gr_query), ":", start(gr_query), "-", end(gr_query))
+  rownames(count_mat) <- paste0(seqnames(all_gr), ":", start(all_gr), "-", end(all_gr))
+  
   return(count_mat)
 }
 
 
-count_to_frac <- function(count_mat, meta) {
+# NOTE: slow. limiting step appears to be tallying the symbols for each
+# range in get_count_mat()
+
+
+if (!file.exists(outfile)) {
   
-  tf_count <- filter(meta) %>% 
-    count(Symbol) %>% 
-    arrange(Symbol, colnames(count_mat)) %>% 
-    pull(n)
-  
-  t(t(count_mat) / tf_count)
-}
-
-
-top_tf <- function(count_mat, tf) {
-  
-  # Sort count_mat by tf column while minimizing the sum of the rest of the cols.
-  # Return the df of in vs out counts, as well as the ordered count mat
-  
-  count_df <- data.frame(
-    Intra_TF = count_mat[, tf],
-    Inter_TF <- rowSums(count_mat[, setdiff(colnames(count_mat), tf)]),
-    row.names = NULL)  # otherwise names may get preserved - need int for sort
-  
-  count_df <- 
-    count_df[order(count_df$Intra_TF, -count_df$Inter_TF, decreasing = TRUE), ]
-  colnames(count_df) <- c("Intra_TF", "Inter_TF")
-  
-  return(list(Count_mat = count_mat[as.integer(rownames(count_df)),],
-              Count_df = count_df))
-}
-
-
-top_tf_frac <- function(count_mat, tf, meta) {
-  
-  tf_count <- c(In = sum(meta$Symbol == tf), Out = sum(meta$Symbol != tf))
-  
-  count_df <- data.frame(
-    Intra_TF = (count_mat[, tf, drop = FALSE] / tf_count["In"]),
-    Inter_TF <- (rowSums(count_mat[, setdiff(colnames(count_mat), tf)]) / tf_count["Out"]),
-    row.names = rownames(count_mat))
-  
-  colnames(count_df) <- c("Intra_TF", "Inter_TF")
-  
-  count_df[order(count_df$Intra_TF, -count_df$Inter_TF, decreasing = TRUE), ]
-  
-}
-
-
-# Human: 
-
-count_mat_hg <- list(
-  All = get_count_mat(all_hg$All, gr_hg, meta_hg, tfs_hg),
-  Resize = get_count_mat(all_hg$Resize, gr_rs_hg, meta_hg, tfs_hg),
-  Reduced = get_count_mat(all_hg$Reduced, gr_hg, meta_hg, tfs_hg),
-  Reduced_resize = get_count_mat(all_hg$Reduced_resize, gr_rs_hg, meta_hg, tfs_hg)
-)
-
-
-tf <- "ASCL1"
-
-top_mat <- top_tf(count_mat_hg$Reduced_resize, tf)$Count_mat
-sum(top_mat[, tf] == max(top_mat[, tf]))
-
-
-# names(gr_hg)[findOverlaps(GRanges(9, 38022988:38023319), gr_rs_hg)@to]
-
-
-# Mouse: 
-
-
-count_mat_mm <- list(
-  All = get_count_mat(all_mm$All, gr_mm, meta_mm, tfs_mm),
-  Resize = get_count_mat(all_mm$Resize, gr_rs_mm, meta_mm, tfs_mm),
-  Reduced = get_count_mat(all_mm$Reduced, gr_mm, meta_mm, tfs_mm),
-  Reduced_resize = get_count_mat(all_mm$Reduced_resize, gr_rs_mm, meta_mm, tfs_mm)
-)
-
-
-tf <- "Neurod1"
-
-top_mat <- top_tf(count_mat_mm$Reduced_resize, tf)$Count_mat
-
-
-# Save out
-saveRDS(list(Human = count_mat_hg, Mouse = count_mat_mm),
-        file = paste0("~/scratch/R_objects/", date, "_count_mat_list.RDS"))
-
-
-# Plots
-# ------------------------------------------------------------------------------
-
-
-### DEMO overlap with cCRE
-
-# cCRE tables -> GR objects
-ccre_hg <- read.delim("~/Data/Chromosome_info/cCREs_V3_hg38.bed", stringsAsFactors = FALSE)
-ccre_hg <- makeGRangesFromDataFrame(ccre_hg, keep.extra.columns = TRUE)
-ccre_hg$Group <- str_replace_all(ccre_hg$Group, ",|-", "_")
-
-ccre_mm <- read.delim("~/Data/Chromosome_info/cCREs_V3_mm10.bed", stringsAsFactors = FALSE)
-ccre_mm <- makeGRangesFromDataFrame(ccre_mm, keep.extra.columns = TRUE)
-ccre_mm$Group <- str_replace_all(ccre_mm$Group, ",|-", "_")
-
-
-bin_groups <- function(str_vec) {
-  # helper to group common cCREs regulatory element types, returning a factor
-  
-  str_vec <- str_replace_all(str_vec, "\\.|,|-", "_")
-  
-  group_vec <- vapply(as.character(str_vec), function(x) {
-    if (x %in% c("pELS_CTCF_bound",
-                 "dELS_CTCF_bound",
-                 "dELS",
-                 "pELS")) {
-      return ("Enhancer-like")
-    } else if (x %in% c("PLS_CTCF_bound",
-                        "PLS")) {
-      return ("Promoter-like")
-    } else if (x %in% c("CTCF_only_CTCF_bound",
-                        "DNase_H3K4me3_CTCF_bound",
-                        "DNase_H3K4me3")) {
-      return ("Other")
-    } else {
-      return ("None")
-    }
-    
-  }, character(1))
-  
-  group_vec <- factor(
-    group_vec, 
-    levels = c("None", "Other", "Enhancer-like", "Promoter-like")
+  count_mat_hg <- list(
+    All = get_count_mat(all_hg$All, gr_hg, meta_hg, cores),
+    Resize = get_count_mat(all_hg$Resize, gr_rs_hg, meta_hg, cores),
+    Reduced = get_count_mat(all_hg$Reduced, gr_hg, meta_hg, cores),
+    Reduced_resize = get_count_mat(all_hg$Reduced_resize, gr_rs_hg, meta_hg, cores)
   )
-}
-
-
-ccre_hg$Bin_group <- as.character(bin_groups(ccre_hg$Group))
-ccre_mm$Bin_group <- as.character(bin_groups(ccre_mm$Group))
-
-
-get_ccre_group <- function(top_df, ccre_gr) {
-  # Given top_df with a column of regions, find overlaps with provded cCRE
-  # object and return the associated cCRE group. If no overlap, return "None", 
-  # if multiple exist, return "Mixed"
   
-  top_gr <- GRanges(top_df$Region)
-  ol <- findOverlaps(top_gr, ccre_gr)
-  # out_vec <- rep("None", nrow(top_df))
+  count_mat_mm <- list(
+    All = get_count_mat(all_mm$All, gr_mm, meta_mm, cores),
+    Resize = get_count_mat(all_mm$Resize, gr_rs_mm, meta_mm, cores),
+    Reduced = get_count_mat(all_mm$Reduced, gr_mm, meta_mm, cores),
+    Reduced_resize = get_count_mat(all_mm$Reduced_resize, gr_rs_mm, meta_mm, cores)
+  )
   
-  ccre_group <- unlist(lapply(1:nrow(top_df), function(x) {
-    group <- unique(ccre_gr$Bin_group[ol[ol@from == x]@to])
-    if (length(group) == 0) {
-      group <- "None"
-    } else if (length(group) > 1) {
-      group <- "Mixed"
-    }
-    return (group)
-  }))
+  saveRDS(list(Human = count_mat_hg, Mouse = count_mat_mm), outfile) 
   
-  ccre_group <- factor(
-    ccre_group,
-    levels = c("None", "Other", "Mixed", "Enhancer-like", "Promoter-like"))
+  } else {
   
-  return(ccre_group)
+  dat <- readRDS(outfile)
+  count_mat_hg <- dat$Human
+  count_mat_mm <- dat$Mouse
 
 }
-
-
-# ccre_hg[findOverlaps(GRanges("9:137441196-137441859"), ccre_hg)@to]
-
-
-bin_cols <- c('#d9d9d9','#6a3d9a','#fdbf6f','#1f78b4', "#33a02c")
-
-
-# scatter of high region overlap for in vs out
-
-
-plist_hg <- lapply(tfs_hg, function(tf) {
-  
-  top_df <- 
-    top_tf_frac(count_mat_hg$Reduced_resize, tf, meta_hg) %>% 
-    rownames_to_column(var = "Region") %>% 
-    filter(Intra_TF > 0.5)
-  
-  top_df$Group <- get_ccre_group(top_df, ccre_hg)
-  
-  p <- 
-    ggplot(top_df, aes(x = Intra_TF, y = Inter_TF, fill = Group)) +
-    geom_jitter(size = 3, shape = 21, height = 0.008, width = 0.01) +
-    theme_classic() +
-    ylab("Proportion overlap inter-TF") +
-    xlab("Proportion overlap intra-TF") +
-    ggtitle(tf) +
-    scale_fill_manual(values = bin_cols) +
-    theme(axis.text = element_text(size = 25),
-          axis.title = element_text(size = 25),
-          plot.title = element_text(size = 25),
-          legend.text = element_text(size = 15),
-          legend.title = element_text(size = 15),
-          legend.position = c(.85, .9))
-  
-})
-names(plist_hg) <- tfs_hg
-
-
-pdf(paste0(plot_dir, date, "_human_freq_bound_by_ccre.pdf"))
-invisible(lapply(plist_hg, print))
-graphics.off()
-
-
-ggplot2::ggsave(plist_hg$ASCL1, dpi = 300, device = "png", height = 8, width = 10,
-       filename = paste0(plot_dir, "ASCL1_freq_bound.png"))
-
-
-plist_mm <- lapply(tfs_mm, function(tf) {
-  
-  top_df <- 
-    top_tf_frac(count_mat_mm$Reduced_resize, tf, meta_mm) %>% 
-    rownames_to_column(var = "Region") %>% 
-    filter(Intra_TF > 0.5)
-  
-  if (nrow(top_df) == 0) {
-    top_df <- 
-      top_tf_frac(count_mat_mm$Reduced_resize, tf, meta_mm) %>% 
-      rownames_to_column(var = "Region") %>% 
-      filter(Intra_TF > 0.2)
-  }
-  
-  
-  top_df$Group <- get_ccre_group(top_df, ccre_mm)
-  
-  p <- 
-    ggplot(top_df, aes(x = Intra_TF, y = Inter_TF, fill = Group)) +
-    geom_jitter(size = 3, shape = 21, height = 0.008, width = 0.01) +
-    theme_classic() +
-    ylab("Proportion overlap inter-TF") +
-    xlab("Proportion overlap intra-TF") +
-    ggtitle(tf) +
-    scale_fill_manual(values = bin_cols) +
-    theme(axis.text = element_text(size = 25),
-          axis.title = element_text(size = 25),
-          plot.title = element_text(size = 25),
-          legend.text = element_text(size = 15),
-          legend.title = element_text(size = 15),
-          legend.position = c(.85, .9))
-  
-})
-names(plist_mm) <- tfs_mm
-
-
-pdf(paste0(plot_dir, date, "_mouse_freq_bound_by_ccre.pdf"))
-invisible(lapply(plist_mm, print))
-graphics.off()
