@@ -5,49 +5,41 @@
 library(tidyverse)
 library(GenomicRanges)
 library(trackplot)
-source("~/regnetR/R/utils/range_table_functions.R")
-source("~/regnetR/R/utils/plot_functions.R")
+source("R/setup-01_config.R")
+source("R/utils/range_table_functions.R")
+source("R/utils/plot_functions.R")
 
+plot_dir <- paste0(cplot_dir, "Trackplots/")
 
-# installing bwtools: https://gist.github.com/PoisonAlien/e19b482ac6146bfb03142a0de1c4fbc8
-# saved this in my own /home/user/bin, then added this dir to R path:
-bwtool_path <- "/home/amorin/bin/bwtool/"
-if (!str_detect(Sys.getenv("PATH"), bwtool_path)) {
-  Sys.setenv(PATH = paste(Sys.getenv("PATH"), bwtool_path, sep = ":"))
-}
+# batch 1 ChIP-seq meta and directories of peak files
+run_ids <- read.delim(paste0(meta_dir, "Chipseq/batch1_run_dirs_", date, ".tsv"), stringsAsFactors = FALSE)
+meta <- read.delim(paste0(meta_dir, "Chipseq/batch1_chip_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
+stopifnot(all(meta$Experiment_ID %in% run_ids$Experiment_ID))
 
-date <- "Apr2022"  # latest update when metadata is saved out
+# For inspection of top bound regions
+count_list <- readRDS(paste0(scratch_dir, date, "_count_mat_list.RDS"))
 
-plot_dir <- "~/Plots/Chipseq/Trackplots/"
-run_dirs <- read.delim(paste0("~/Data/Metadata/Chipseq/batch1_run_dirs_", date, ".tsv"), stringsAsFactors = FALSE)
-meta <- read.delim(paste0("~/Data/Metadata/Chipseq/batch1_chip_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
-chip_dir <- "/cosmos/data/pipeline-output/chipseq-encode-pipeline/chip/"
-
-# For inspection of coordinates and how often a TR dataset overlappeds
-region_list <- readRDS(paste0("~/scratch/R_objects/", date, "_count_mat_list.RDS"))
-regions <- region_list$Human$Reduced_resize
-regions <- regions[order(regions[, "ASCL1"], decreasing = TRUE), ]
+# Top specifically bound region for ASCL1
 locus <- "chr9:38022988-38023319"
 
+# How many bps should be added to start and end of region
+pad_window <- 500  
 
-tf <- "Ascl1"
 
-ncores <- 8
-pad_window <- 500  # how many bps should be added to start and end of region
+
+# Returns the full path of bigwig files produced by the ENCODE pipeline. For 
+# the given Run ID. Assumes typical dir structure of a run after organize meta
+# has been run. 
+# run_id: the metadata Experiment_ID associated with an ENCODE run
+# dir_location: table that associates the run with its dir location
+# bw_track: either "pval.signal.bigwig" or "fc.signal.bigwig" (pval or foldchange)
+# pooled_reps: if multiple reps exist, return the pooled rep? one of exclude", "include", or "only"
 
 
 get_bw_files <- function(run_id,
-                         dir_location = run_dirs,
+                         dir_location = run_ids,
                          bw_track = "pval.signal.bigwig",
                          pooled_reps = "include") {
-  
-  # Returns the full path of bigwig files produced by the ENCODE pipeline. For 
-  # the given Run ID. Assumes typical dir structure of a run after organize meta
-  # has been run. 
-  # run_id: the metadata Experiment_ID associated with an ENCODE run
-  # dir_location: table that associates the run with its dir location
-  # bw_track: either "pval.signal.bigwig" or "fc.signal.bigwig" (pval or foldchange)
-  # pooled_reps: if multiple reps exist, return the pooled rep? one of exclude", "include", or "only"
   
   path <- paste0(filter(dir_location, Experiment_ID == run_id)$Dir, "/signal")
   reps <- list.files(path, full.names = TRUE)
@@ -71,11 +63,14 @@ get_bw_files <- function(run_id,
 }
 
 
+# Increase the size of the locus by provided window size
+
 pad_locus <- function(locus, window_size) {
-  # Increase the size of the locus by provided window size
+  
   split_locus <- str_split(locus, ":|-", simplify = TRUE)
   start <- as.integer(split_locus[, 2]) - window_size
   end <- as.integer(split_locus[, 3]) + window_size
+  
   return(paste0(split_locus[1], ":", start, "-", end))
 }
 
@@ -83,6 +78,7 @@ pad_locus <- function(locus, window_size) {
 
 # Get ASCL1 IDs, sample 2 IDs from rest of TRs, and tack on the 2 TCF4 experiments
 # that also had a peak called
+
 
 set.seed(13)
 
@@ -110,7 +106,7 @@ id_sample <- rbind(id_sample, tcf4)
 
 # trackplot colours by TR
 
-col_ascl1 <- tf_pal[tf]
+col_ascl1 <- tf_pal["Ascl1"]
 col_sample <- tf_pal[str_to_title(id_sample$Symbol)]
 
 
@@ -127,7 +123,7 @@ track_ascl1 <- track_extract(
   loci = pad_locus(locus, pad_window),
   binsize = 10,
   custom_names = id_ascl1,
-  nthreads = ncores
+  nthreads = cores
 )
 
 
@@ -136,7 +132,7 @@ track_sample <- track_extract(
   loci = pad_locus(locus, pad_window),
   binsize = 10,
   custom_names = id_sample$Experiment_ID,
-  nthreads = ncores
+  nthreads = cores
 )
 
 
