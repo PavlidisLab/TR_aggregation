@@ -64,15 +64,24 @@ ChIP-seq experiments and saves out plots.
 ```
 
 ### chipgr-
-
+These scripts organize and analyze ChIP-seq experiments at the loci level as
+GenomicRange objects.
 ```
-01
+01_save_grlist.R : Exports all experiments as GRList objects grouped by species.
+
+02_explore_overlap.R : Summarize peak sizes and distributions before re-sizing
+and reducing, saving out a list of matrices of region x TF count overlap
+
+03_overlap_ccre.R : Explores the overlap of ChIP-seq peaks with ENCODE candidate
+cis regulatory elements
 ```
 
 ### trackplot-
+For visualizing the aligned tracks of ChIP-seq experiments
 
 ```
-01
+01_ASCL1_SHB.R : Exports a plot of an intronic region in SHB bound by every
+human ASCL1 experiment but rarely bound by the other TRs
 ````
 
 ### gemma-
