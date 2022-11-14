@@ -12,11 +12,8 @@ meta <- read.delim(paste0(meta_dir, "Chipseq/batch1_chip_meta_final_", date, ".t
 stopifnot(all(meta$Experiment_ID %in% run_ids$Experiment_ID))
 
 # Load ENCODE blacklists and convert to GRanges
-bl_hg <- read.delim(bl_path_hg, stringsAsFactors = FALSE)
-bl_gr_hg <- bl_to_gr(bl_hg)
-
-bl_mm <- read.delim(bl_path_mm, stringsAsFactors = FALSE)
-bl_gr_mm <- bl_to_gr(bl_mm)
+bl_hg <- bl_to_gr(read.delim(bl_path_hg, stringsAsFactors = FALSE))
+bl_mm <- bl_to_gr(read.delim(bl_path_mm, stringsAsFactors = FALSE))
 
 ids <- left_join(meta, run_ids[, c("Experiment_ID", "Dir")], by = "Experiment_ID")
 
