@@ -4,128 +4,97 @@
 
 library(tidyverse)
 library(parallel)
-source("~/regnetR/R/utils/range_table_functions.R")
+source("R/setup-01_config.R")
+source("R/utils/range_table_functions.R")
 
-date <- "Apr2022"
-dist <- 25e3
-unique_symbols_flag <- TRUE  # every row of pc anno table or just unique symbols
-peakset <- "idr"  # idr for TF (but overlap still for mecp2) or all overlap
+dist <- 25e3  # window size in base pairs to consider a peak->TSS assignment
 
-pipeline_dir <- "/cosmos/data/pipeline-output/chipseq-encode-pipeline/chip"
-out_dir <- "~/Data/Annotated_objects/Bind_matrices/Encpipe/"
+pipeline_dir <- paste0(pipeout_dir, "chip/")
 
-pc_hg <- read.delim("~/Data/Metadata/refseq_select_hg38.tsv", stringsAsFactors = FALSE)
-pc_mm <- read.delim("~/Data/Metadata/refseq_select_mm10.tsv", stringsAsFactors = FALSE)
-pc_ortho <- read.delim("~/Data/Metadata/hg_mm_1to1_ortho_genes_DIOPT-v8.tsv", stringsAsFactors = FALSE)
+# Load metadata and link IDs to their corresponding directory
+run_ids <- read.delim(paste0(meta_dir, "Chipseq/batch1_run_dirs_", date, ".tsv"), stringsAsFactors = FALSE)
+meta <- read.delim(paste0(meta_dir, "Chipseq/batch1_chip_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
 
-bl_hg <- read.delim("~/Data/Chromosome_info/blacklist_hg38.tsv", stringsAsFactors = FALSE)
-bl_mm <- read.delim("~/Data/Chromosome_info/blacklist_mm10.tsv", stringsAsFactors = FALSE)
-
-# Need to link meta/experiment IDs with corresponding directory
-run_ids <- read.delim(paste0("~/Data/Metadata/Chipseq/batch1_run_dirs_", date, ".tsv"), stringsAsFactors = FALSE)
-meta <- read.delim(paste0("~/Data/Metadata/Chipseq/batch1_chip_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
 stopifnot(all(meta$Experiment_ID %in% run_ids$Experiment_ID))
-run_ids <- filter(run_ids, Experiment_ID %in% meta$Experiment_ID)
-
 stopifnot(!any(run_ids$Dir == "" | is.na(run_ids$Dir)))
 
+run_ids <- filter(run_ids, Experiment_ID %in% meta$Experiment_ID)
 ids_hg <- run_ids[run_ids$Species == "Human", ]
 ids_mm <- run_ids[run_ids$Species == "Mouse", ]
 
-# Remove duplicated pseudoautosomal genes (keep X copy)
+# Load protein coding tables for gene annotation
+pc_hg <- read.delim(paste0(meta_dir, "refseq_select_hg38.tsv"), stringsAsFactors = FALSE)
+pc_mm <- read.delim(paste0(meta_dir, "refseq_select_mm10.tsv"), stringsAsFactors = FALSE)
+pc_ortho <- read.delim(paste0(meta_dir, "hg_mm_1to1_ortho_genes_DIOPT-v8.tsv"), stringsAsFactors = FALSE)
+
+# Remove duplicated pseudoautosomal genes in human (keep X copy)
 dupl <- pc_hg$Symbol[duplicated(pc_hg$Symbol)]
-pc_hg <- filter(pc_hg, !(Symbol %in% dupl & Chromosome == "Y"))
+pc_hg <- filter(pc_hg, !(Symbol %in% dupl & Chromosome == "Y"))  
 
-# TODO: hacky fix from ensembl->refseq, need to re-write anno function
-pc_hg <- pc_hg %>% 
-  mutate(Gene_ID = str_replace(Refseq_ID, "_", ""), Transcript_ID = NA)
+# Protein coding tables to GR objects
+pc_hg <- pc_to_gr(pc_hg)
+pc_mm <- pc_to_gr(pc_mm)
 
-pc_mm <- pc_mm %>% 
-  mutate(Gene_ID = str_replace(Refseq_ID, "_", ""), Transcript_ID = NA)
+# Load ENCODE blacklists and convert to GRanges
+bl_hg <- bl_to_gr(read.delim(bl_path_hg, stringsAsFactors = FALSE))
+bl_mm <- bl_to_gr(read.delim(bl_path_mm, stringsAsFactors = FALSE))
 
 
-# Call distance anno for every run, which produces a binary vector of gene IDs
-# or unique symbol, filled if a peak was found within the input distance. 
-# Bind these vectors into a matrix
+# Into list:
+# 1) Load individual peak table
+# 2) Get peak summits
+# 3) remove blacklisted
+# 4) Get binary binding scores
+# 5) Bind list into matrix
 #-------------------------------------------------------------------------------
 
 
+load_and_score <- function(input_df, bl_gr, pc_gr, cores) {
+  
+  scores_l <- lapply(1:nrow(input_df), function(x) {
+    
+    # MECP2 overlap peaks (histone pipeline), all others IDR peaks
+    pipeline_type <- 
+      ifelse(str_detect(input_df$Experiment_ID[x], "HISTONE"), "overlap", "idr")
+    
+    peak_gr <- 
+      read_encpeak(input_df$Dir[x], peakset = pipeline_type) %>% 
+      peak_to_gr() %>%
+      filter_blacklist(bl_gr)
+    
+    scores <- binary_scores(pc_gr, peak_gr, dist)
+    
+    message(input_df$Experiment_ID[x], " complete ", Sys.time())
+    return(scores)
+  })
+  
+  mat <- do.call(cbind, scores_l)
+  colnames(mat) <- input_df$Experiment_ID
+  return(mat)
+}
+
+
 # Human
-
-bind_list_hg <- lapply(1:nrow(ids_hg), function(i) {
-  
-  # hacky: check if mecp2 histone run
-  
-  pipeline_type <- 
-    ifelse(str_detect(ids_hg$Experiment_ID[i], "HISTONE"), "overlap", peakset)
-  
-  peak_table <- read_encpeak(ids_hg$Dir[i], peakset = pipeline_type)
-  
-  bind_vec <- distance_anno(
-    peak_table = peak_table,
-    gene_table = pc_hg,
-    bl_table = bl_hg,
-    distance = dist,
-    unique_symbols = unique_symbols_flag
-  )
-
-  message(ids_hg$Experiment_ID[i], " complete ", Sys.time())
-  
-  return(bind_vec)
-
-})
-
-mat_hg <- do.call(cbind, bind_list_hg)
-colnames(mat_hg) <- ids_hg$Experiment_ID
-
+mat_hg <- load_and_score(ids_hg, bl_hg, pc_hg, cores)
 
 # Mouse
-
-bind_list_mm <- lapply(1:nrow(ids_mm), function(i) {
-  
-  # hacky: check if mecp2 histone run
-  
-  pipeline_type <- 
-    ifelse(str_detect(ids_mm$Experiment_ID[i], "HISTONE"), "overlap", peakset)
-  
-  peak_table <- read_encpeak(ids_mm$Dir[i], peakset = pipeline_type)
-  
-  bind_vec <- distance_anno(
-    peak_table = peak_table,
-    gene_table = pc_mm,
-    bl_table = bl_mm,
-    distance = dist,
-    unique_symbols = unique_symbols_flag
-  )
-  
-  message(ids_mm$Experiment_ID[i], " complete ", Sys.time())
-  
-  return(bind_vec)
-  
-})
-
-mat_mm <- do.call(cbind, bind_list_mm)
-colnames(mat_mm) <- ids_mm$Experiment_ID
-
+mat_mm <- load_and_score(ids_mm, bl_mm, pc_mm, cores)
 
 
 # Build ortho mat, using all experiments and 1:1 orthologs
 #-------------------------------------------------------------------------------
 
 
-subset_to_ortho <- function(mat, pc_vec) {
-  # subset and order rows of mat to vec of ortho protein coding genes
-  mat <- mat[rownames(mat) %in% pc_vec, ]
-  mat <- mat[order(match(rownames(mat), pc_vec)), ]
-  return(mat)
-}
+symbol_ortho <- pc_ortho %>% 
+  filter(Symbol_hg %in% rownames(mat_hg) & 
+           Symbol_mm %in% rownames(mat_mm))
 
-
-mat_ortho <- cbind(subset_to_ortho(mat_hg, pc_ortho$Symbol_hg),
-                   subset_to_ortho(mat_mm, pc_ortho$Symbol_mm))
+mat_ortho <- cbind(mat_hg[symbol_ortho$Symbol_hg, ], 
+                   mat_mm[symbol_ortho$Symbol_mm, ])
 
 mat_ortho <- mat_ortho[, meta$Experiment_ID]
-rownames(mat_ortho) <- pc_ortho$ID
+
+rownames(mat_ortho) <- symbol_ortho$ID
 
 
 stopifnot(identical(
@@ -140,24 +109,23 @@ stopifnot(identical(
 ))
 
 
-
 # Save 
-# ------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 
 
 saveRDS(
   object = mat_hg,
-  file = paste0(out_dir, "binary_refseq_human_batch1_", date, "_", "distance=", dist/1e3, "kb_uniquesymbol=", unique_symbols_flag, "_peakset=", peakset, ".RDS")
+  file = paste0(cmat_dir, "binary_refseq_human_batch1_", date, "_", "distance=", dist/1e3, "kb.RDS")
 )
 
 
 saveRDS(
   object = mat_mm,
-  file = paste0(out_dir, "binary_refseq_mouse_batch1_", date, "_", "distance=", dist/1e3, "kb_uniquesymbol=", unique_symbols_flag, "_peakset=", peakset, ".RDS")
+  file = paste0(cmat_dir, "binary_refseq_mouse_batch1_", date, "_", "distance=", dist/1e3, "kb.RDS")
 )
 
 
 saveRDS(
   object = mat_ortho,
-  file = paste0(out_dir, "binary_refseq_ortho_batch1_", date, "_", "distance=", dist/1e3, "kb_uniquesymbol=", unique_symbols_flag, "_peakset=", peakset, ".RDS")
+  file = paste0(cmat_dir, "binary_refseq_ortho_batch1_", date, "_", "distance=", dist/1e3, "kb.RDS")
 )
