@@ -1,37 +1,32 @@
-## Code to load/work with ChIP-seq narrowPeak/range/BED tables and GRanges
+## Code to load/work with ChIP-seq narrowPeak/range/BED tables as data frames
+## and as GenomicRanges objects
+
 
 library(GenomicRanges)
 library(tidyverse)
 library(parallel)
-library(rtracklayer)
 
 
 # Read peak tables
 # ------------------------------------------------------------------------------
 
 
+# Read peak table generated from ENCODE pipeline.
+# Assumes that dir has the default structure output by the pipeline.
+# peakset corresponds to IDR or overlap reproducible peak sets
+# type can either be optimal or conservative - suggest optimal.
+
 read_encpeak <- function(dir,
                          peakset = "idr",
                          type = "optimal",
                          path = "/cosmos/data/pipeline-output/chipseq-encode-pipeline/chip/") {
-  # Read peak table generated from ENCODE pipeline.
-  # Assumes that input dir has the standard dir structure output by the pipeline.
-  # peakset corresponds to IDR or overlap reproducible peak sets
-  # type can either be optimal or conservative - suggest optimal.
+  
   
   stopifnot(peakset %in% c("idr", "overlap") | type %in% c("optimal", "conservative"))
   
   path <- 
     paste0(dir, "/peak/", peakset, "_reproducibility/", peakset, ".", type, "_peak.narrowPeak.gz")
   
-  
-  # if (chip == "TF") {
-  #   path <- 
-  #     paste0(dir, "/peak/idr_reproducibility/idr.", type, "_peak.narrowPeak.gz")
-  # } else {
-  #   path <- 
-  #     paste0(dir, "/peak/overlap_reproducibility/overlap.", type, "_peak.narrowPeak.gz")
-  # }
   
   range_table <- read.delim(
     path,
@@ -61,8 +56,9 @@ read_encpeak <- function(dir,
 # ------------------------------------------------------------------------------
 
 
+# returns the table ordered by chromosome and start
+
 order_chroms <- function(range_table) {
-  # returns the table ordered by chromosome and start
   
   stopifnot(c("Chromosome", "Start") %in% names(range_table))
   
@@ -74,26 +70,29 @@ order_chroms <- function(range_table) {
   
   range_table <- range_table[order_ix,]
   rownames(range_table) <- NULL
+  
   return(range_table)
 }
 
 
+# Adds a column for the peak summit position, and strips the original 
+# MACS column which just shows distance relative to peak start
+
 get_summit_position <- function(range_table) {
-  # Adds a column for the peak summit position, and strips the original 
-  # MACS column which just shows distance relative to peak start
   
   stopifnot(c("Summit_from_start", "Start") %in% names(range_table))
   
   range_table$Peak_summit <- range_table$Start + range_table$Summit_from_start
   range_table <- range_table[, colnames(range_table) != "Summit_from_start"]
+  
   return(range_table)
 }
 
 
+# remove 'chr' prefix of chromosome identifiers, coerce mitochondrial to 
+# 'MT' and only keep standard autosomal and sex chromosomes
 
 get_standard_chr <- function(range_table) {
-  # remove 'chr' prefix of chromosome identifiers, coerce mitochondrial to 
-  # 'MT' and only keep standard chromosomes
   
   stopifnot("Chromosome" %in% names(range_table))
   
@@ -104,8 +103,9 @@ get_standard_chr <- function(range_table) {
 }
 
 
+# change strand information from 1/-1 to +/-
+
 strand_to_plusminus <- function(range_table) {
-  # change strand information from 1/-1 to +/-
   
   stopifnot("Strand" %in% names(range_table))
   
@@ -115,24 +115,28 @@ strand_to_plusminus <- function(range_table) {
 }
 
 
+# Coerce start and end coordinates to be the peak summit - used to fix a peak
+# as a single point when performing overlaps
+
 startend_to_summit <- function(range_table) {
-  # Coerce start and end coordinates to be the peak summit - used to fix a peak
-  # as a single point when performing overlaps
   
   stopifnot(c("Start", "End", "Peak_summit") %in% names(range_table))
   
   range_table$Start <- range_table$End <- range_table$Peak_summit
+  
   return(range_table)
 }
 
 
+# Coerce start and end of gene annotation table to just the TSS - used to fix
+# TSS in protein coding tables as a single point when performing overlaps
+
 startend_to_tss <- function(range_table) {
-  # Coerce start and end of gene annotation table to just the TSS - used to fix
-  # TSS as a single point when performing overlaps
   
   stopifnot(c("Start", "End", "Transcription_start_site") %in% names(range_table))
   
   range_table$Start <- range_table$End <- range_table$Transcription_start_site
+  
   return(range_table)
 }
 
@@ -141,9 +145,10 @@ startend_to_tss <- function(range_table) {
 # ------------------------------------------------------------------------------
 
 
+# Used to format a peak table to be compatible for conversion to a GRanges
+# object for overlap with a gene annotation table. 
+
 format_peak_attributes <- function(range_table) {
-  # Used to format a peak table to be compatible for conversion to a GRanges
-  # object for overlap with a gene annotation table. 
   
   range_table <- range_table %>% 
     get_summit_position() %>% 
@@ -154,10 +159,11 @@ format_peak_attributes <- function(range_table) {
 }
 
 
+# Convert a peak table to a GR object. If format is TRUE, the table will
+# first be processed to be consistent with standard used for overlapping with
+# a gene annotation table. 
+
 peak_to_gr <- function(range_table, format = TRUE) {
-  # Convert a peak table to a GR object. If format is TRUE, the table will
-  # first be processed to be consistent with standard used for overlapping with
-  # a gene annotation table. 
   
   if (format) {
     range_table <- format_peak_attributes(range_table)
@@ -170,23 +176,30 @@ peak_to_gr <- function(range_table, format = TRUE) {
 }
 
 
-pc_to_gr <- function(range_table) {
-  # Prepare a gene annotation table for overlap and convert to a GR object
+
+# Convert a gene annotation table to a GR object. If TSS is TRUE, will fix
+# gene start and end coordinates to be the 1bp TSS
+
+
+pc_to_gr <- function(range_table, TSS = TRUE) {
   
-  range_table <- range_table %>% 
-    strand_to_plusminus() %>% 
-    startend_to_tss()
+  range_table <- strand_to_plusminus(range_table)
   
+  if (TSS) {
+    range_table <- startend_to_tss(range_table)
+  }
+
   gr <- makeGRangesFromDataFrame(range_table,
-                                 keep.extra.columns = TRUE, 
+                                 keep.extra.columns = TRUE,
                                  ignore.strand = FALSE)
   
   return(gr)
 }
 
 
+# Convert a blacklisted regions table to a GR object
+
 bl_to_gr <- function(range_table) {
-  # Wrapper to convert blacklist range table to a GR object
   
   stopifnot(c("Chromosome", "Start", "End") %in% names(range_table))
   
@@ -198,11 +211,11 @@ bl_to_gr <- function(range_table) {
 }
 
 
+# Convert a GRanges object back to a dataframe
+
 gr_to_df <- function(gr) {
-  # Wrapper to convert a GRanges object back to a dataframe
   
   df <- GenomicRanges::as.data.frame(gr) %>% 
-    dplyr::select(-width) %>%  # remove added width column
     dplyr::rename(Chromosome = seqnames, 
                   Start = start, 
                   End = end, 
@@ -211,29 +224,23 @@ gr_to_df <- function(gr) {
 }
 
 
-liftover_peak <- function(peak_table, chain) {
-  # Uses rtracklayer::liftOver, which expects a Granges object. Converts
-  # peak_table to a GRanges object and after liftover will remove redundant
-  # strand column and convert back to a data frame
+
+# Fix range of GR to the summit position and pad with a fixed window
+
+summit_window <- function(gr, window_size) {
   
-  # format = FALSE keeps range information consistent with liftover formatting
-  # format = TRUE for keeping range information consistent with ensembl table
-  peak_gr <- peak_to_gr(peak_table, format = FALSE)
-  peak_gr_lo <- unlist(rtracklayer::liftOver(peak_gr, chain))
-  peak_gr_lo$Strand <- NULL
-  peak_table_lo <- gr_to_df(peak_gr_lo)
-  return (peak_table_lo)
+  stopifnot("Summit_from_start" %in% names(gr@elementMetadata))
+  
+  start(gr) <- end(gr) <- start(gr) + gr$Summit_from_start
+  gr <- gr + window_size
+  return(gr)
 }
 
 
-
-# Binary annotation/nearest with GRanges
-# ------------------------------------------------------------------------------
-
+# Given GR objects corresponding to a peak table and a blacklist table,
+# return peak_gr with any ranges overlapping bl_gr removed
 
 filter_blacklist <- function(peak_gr, bl_gr) {
-  # Given GR objects corresponding to a peak table and a blacklisted table,
-  # return peak_gr with any ranges overlapping bl_gr removed
   
   hits <- suppressWarnings(
     findOverlaps(
@@ -247,297 +254,127 @@ filter_blacklist <- function(peak_gr, bl_gr) {
   if (length(hits) > 0) {
     peak_gr <- peak_gr[-hits@from]
   }
+  
   return(peak_gr)
 }
 
 
-get_gene_names <- function(range_table) {
-  # Given a gene annotation range table, return a vector of length equal to the
-  # number of rows in range_table, where each element is a concat of the gene 
-  # symbol, chromosome, start, end, and transcript ID. 
-  # Used for making unique names for repetitively named symbols/IDs
-  
-  stopifnot(
-    c(
-      "Gene_ID",
-      "Symbol",
-      "Chromosome",
-      "Start",
-      "End",
-      "Transcript_ID"
-    ) %in% names(range_table)
-  )
-  
-  # Set blanks to NULL
-  range_table$Symbol <- 
-    ifelse(range_table$Symbol == "", "NULL", range_table$Symbol)
-  
-  range_table$Transcript_ID <- 
-    ifelse(range_table$Transcript_ID == "", "NULL", range_table$Transcript_ID)
-  
-  
-  gene_names <- paste(range_table$Gene_ID,
-                      range_table$Symbol,
-                      range_table$Chromosome,
-                      range_table$Start,
-                      range_table$End,
-                      range_table$Transcript_ID,
-                      sep = "_")
-  
-  stopifnot(n_distinct(gene_names) == nrow(range_table))
-  return(gene_names)
-}
+# Binding score gene assignment using GRanges
+# ------------------------------------------------------------------------------
 
 
-subset_to_symbol <- function(bind_vec, range_table) {
-  # Assumes bind_vec is a named vector whose elements correspond to bind scores
-  # and range_table is a gene annotation coding. Names of bind_vec are assumed
-  # to be of form [Gene_ID]_[Symbol]_[Chromosome]_[Start]_[End]_[Transcript_ID].
-  # Returns a named binary vector corresponding to the unique symbols in the 
-  # names of bind_vec
-  
-  stopifnot(all(names(bind_vec) == "") | "Symbol" %in% names(range_table))
-  
-  symbols <- unique(range_table$Symbol)
-  symbols <- symbols[symbols != ""]
-  
-  symbol_vec <- rep(0, length(symbols))
-  names(symbol_vec) <- symbols
-  
-  sub_vec <- bind_vec[bind_vec == 1]
-  
-  if (length(sub_vec) > 0) {
-    bind_symbols <- unique(str_split(names(sub_vec), "_", simplify = TRUE)[, 2])
-    symbol_vec[symbols %in% bind_symbols] <- 1
-  }
-  return(symbol_vec)
-}
+# Get a binary vector indicating whether genes had a proximal binding event
+#
+# pc_gr: A GR object of protein coding gene with range fixed to the 1bp TSS
+# peak_gr: A GR object of the peaks with range fixed to the 1bp summit
+# max_dist: An integer of the distance cutoff in bps
+# returns a numeric vector the length of pc_gr of the binary binding status
 
 
-
-distance_anno <- function(peak_table, 
-                          gene_table, 
-                          bl_table = NULL, 
-                          distance,
-                          unique_symbols = TRUE) {
-  # 
+binary_scores <- function(pc_gr, peak_gr, max_dist = 25e3) {
   
-  # Create GR objects
-  peak_gr <- peak_to_gr(peak_table)
-  pc_gr <- pc_to_gr(gene_table)
+  stopifnot(class(pc_gr) == "GRanges", class(peak_gr) == "GRanges")
   
-  # Remove blacklisted regions
-  if (hasArg(bl_table)) {
-    bl_gr <- bl_to_gr(bl_table)
-    peak_gr <- filter_blacklist(peak_gr, bl_gr)
-  }
-  
-  # Generate GR object of overlaps within distance. Silence verbose warnings
-  hits <- suppressWarnings(  
+  hits <- suppressWarnings(
     findOverlaps(
       query = pc_gr,
       subject = peak_gr,
       ignore.strand = TRUE,
       type = "any",
       select = "all",
-      maxgap = distance
+      maxgap = max_dist
     )
   )
   
-  # Create a gene vector from gene table and fill if hits were found
-  gene_vec <- ifelse(1:nrow(gene_table) %in% hits@from, 1, 0)
-  names(gene_vec) <- get_gene_names(gene_table) 
+  gene_vec <- ifelse(1:length(pc_gr) %in% hits@from, 1, 0)
+  names(gene_vec) <- pc_gr$Symbol
   
-  if (unique_symbols) {
-    gene_vec <- subset_to_symbol(gene_vec, gene_table)
-  }
   return(gene_vec)
 }
 
 
-# get_nearest_symbol <- function(peak_gr, pc_gr) {
-#   # Given a GR of a chip/narrowpeak table and a protein coding GR object, return
-#   # a vector size of length(peak_gr), where each element is the symbol of the 
-#   # nearest gene
-#   stopifnot(class(peak_gr) == "Granges" | class(pc_gr) == "GRanges")
-#   
-#   nearest <- pc_gr@elementMetadata$Symbol[nearest(peak_gr, pc_gr)]
-#   return(nearest)
-# }
+# Generate a gene binding score of peak-gene distance using an exponential decay
+# function proposed in Ouyang et al., 2009 https://www.pnas.org/content/106/51/21521
+# The original formulation scaled the score by the MACS2 score, which is 
+# excluded here following contemporary practices
+#
+# distance: A vector of integers of the basepairs between a gene TSS and peak summits.
+# decay_constant: An integer controlling how steeply the score decreases
+# returns: An integer
 
 
-# distance_to_nearest <- function(gr1, gr2) {
-#   # gr1 and gr2 as Grange objects. for each range in gr1, find the nearest
-#   # range in gr2. returns a vector of integers equal to length of gr1/
-#   
-#   stopifnot(class(gr1) == "Granges" | class(gr2) == "GRanges")
-#   
-#   distance <- distanceToNearest(gr1, gr2)@elementMetadata$distance
-#   return(distance)
-# }
-
-
-# Code to generate the gene assignment scores proposed in Ouyang 2009. 
-# Adapted from TFTargetCaller's implementation
-# https://www.pnas.org/content/106/51/21521
-# https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1003342
-# ------------------------------------------------------------------------------
-
-
-get_dist_mat <- function(peak_table, gene_table, cores = 8) {
+ouyang <- function(distance, decay_constant = 5e3) {
   
-  # Take in a peak table (typically narrowPeak from MACS2) and a protein coding
-  # annotation table. Return a list of equal length to their chromosomes. Each
-  # element of the list is a matrix, with rows as gene symbols and columns
-  # as unique peaks. Each element of the matrix is the distance between the TSS
-  # and the summit of the peak
+  stopifnot(is.integer(distance), length(distance) > 0)
   
-  chromosomes <- intersect(peak_table$Chromosome, gene_table$Chromosome)
-  stopifnot(all(unique(gene_table$Strand) %in% c(1, -1)))
+  scores <- lapply(distance, function(x) {
+    exp(-(abs(x) / decay_constant))
+  })
   
-  dist_mat_per_chr <- mclapply(chromosomes, function(chr) {
-    
-    gene_chr <- gene_table[which(gene_table$Chromosome == chr),]
-    peak_chr <- peak_table[which(peak_table$Chromosome == chr),]
-    
-    distance <- matrix(
-      sapply(peak_chr$Peak_summit, function(x) {
-        x - gene_chr$Transcription_start_site
-      }), nrow = nrow(gene_chr), ncol = nrow(peak_chr))
-    
-    distance <- distance * gene_chr$Strand
-    
-    rownames(distance) <- get_gene_names(gene_chr)
-    colnames(distance) <- peak_chr$ID
-    
-    return(distance)
-  }, mc.cores = cores)
-  names(dist_mat_per_chr) <- paste0("chr", chromosomes)
-  return(dist_mat_per_chr)
-}
-
-
-match_score_symbols <- function(bind_scores, gene_table) {
-  # Note that this assumes that scores is named with gene IDs. Fills
-  # out the array of unique gene IDs with 0s for any genes that were not
-  # represented on the peak table
-  
-  scores_vec <- rep(0, nrow(gene_table))
-  names(scores_vec) <- get_gene_names(gene_table)
-  where <- match(names(bind_scores), names(scores_vec))
-  scores_vec[where] <- bind_scores
-  return(scores_vec)
-}
-
-
-get_ouyang_score <- function(intensity, distance, decay_constant = 5000) {
-  # Exponential decay relationship proposed in Ouyang et al., 2009
-  # Computes the score for a single peak/gene, where intensity is the
-  # MACS2 score for a peak and distance is the peak summit to the TSS of interest
-  return (intensity * exp(-(abs(distance)/decay_constant)))
-}
-
-
-get_beta_score <- function(distance, base = 1e5) {
-  # Exponential decay relationship proposed in XX
-  # Computes the score for a single peak/gene
-  return (exp(-0.5 - (4 * abs(distance)/base)))
-}
-
-
-all_ouyang_scores <- function(range_table, 
-                              gene_table, 
-                              decay_constant = 5e3, 
-                              cores = 8,
-                              use_intensity = TRUE,
-                              dist_threshold = 1e6) {
-  
-  # Generates individual Ouyang scores for each peak/TSS combo, and then 
-  # sums up all peak scores for a gene, returning a vector of scores of length
-  # equal to the rows of gene_table
-  
-  chromosomes <- intersect(range_table$Chromosome, gene_table$Chromosome)
-  
-  if (use_intensity) {
-    peak_intensity_list <- lapply(chromosomes, function(chr) {
-      return(range_table[range_table$Chromosome == chr, "Score"])
-    })
-  } else {
-    peak_intensity_list <- lapply(chromosomes, function(chr) {
-      return(rep(1, nrow(range_table[range_table$Chromosome == chr, ])))
-    })
-  }
-  
-  dist_matrix_list <- get_dist_mat(range_table, gene_table)
-  
-  ouyang_scores <- unlist(mcmapply(function(a, b) { 
-    
-    a[abs(a) > dist_threshold] <- NA
-    
-    result <- apply(a, 1, function(x) {
-      y <- get_ouyang_score(b, x, decay_constant)
-      return(sum(y, na.rm = TRUE))
-    })
-    
-    return(result) 
-  },
-  a = dist_matrix_list,
-  b = peak_intensity_list,
-  mc.cores = cores), 
-  use.names = FALSE)
-  
-  names(ouyang_scores) <- unlist(lapply(dist_matrix_list, row.names))
-  ouyang_scores <- match_score_symbols(ouyang_scores, gene_table) 
-  return(ouyang_scores)
-}
-
-
-all_beta_scores <- function(range_table,
-                            gene_table,
-                            cores = 8,
-                            dist_base = 1e5) {
-  
-  # Generates individual Beta scores for each peak/TSS combo, and then 
-  # sums up all peak scores for a gene, returning a vector of scores of length
-  # equal to the rows of gene_table
-  
-  chromosomes <- intersect(range_table$Chromosome, gene_table$Chromosome)
-  
-  dist_matrix_list <- get_dist_mat(range_table, gene_table)
-
-  beta_scores <- unlist(mclapply(dist_matrix_list, function(a) { 
-    
-    a[abs(a) > dist_base] <- NA
-
-    result <- apply(a, 1, function(x) {
-      y <- get_beta_score(x, dist_base)
-      return(sum(y, na.rm = TRUE))
-    })
-    
-    return(result) 
-  }, mc.cores = cores))
-  
-  names(beta_scores) <- unlist(lapply(dist_matrix_list, row.names))
-  beta_scores <- match_score_symbols(beta_scores, gene_table)
-  return(beta_scores)
+  return(sum(unlist(scores)))
 }
 
 
 
-max_score_per_symbol <- function(score, gene_table) {
-  # Only take the highest score per symbol.
+# Generate a gene binding score of peak-gene distance using formulation proposed
+# in Wang et al., 2013 https://www.nature.com/articles/nprot.2013.150 
+#
+# distance: A vector of integers of the basepairs between a gene TSS and peak summits.
+# decay_constant: An integer controlling how steeply the score decreases
+# returns: An integer
+
+
+beta <- function(distance, base = 1e5) {
   
-  gene_df <- data.frame(
-    Gene = str_split(names(score), pattern = "_", simplify = TRUE)[, 2],
-    Score = score
-  )
+  stopifnot(is.integer(distance), length(distance) > 0)
   
-  max_gene_df <- gene_df %>% 
-    group_by(Gene) %>% 
-    arrange(desc(Score), .by_group = TRUE) %>% 
-    filter(row_number() == 1)
+  scores <- lapply(distance, function(x) {
+    exp(-(0.5 + 4 * abs(x) / base))
+  })
   
-  scores <- max_gene_df$Score
-  names(scores) <- max_gene_df$Gene
-  scores[order(match(names(scores), gene_table$Symbol))]
+  return(sum(unlist(scores)))
+}
+
+
+
+# Generate binding scores for every gene from a provided peak GR object.
+#
+# pc_gr: A GR object of protein coding gene with range fixed to the 1bp TSS
+# peak_gr: A GR object of the peaks with range fixed to the 1bp summit
+# method: A character indicating which scoring method to use
+# max_dist: An integer specifying the cutoff (in bps) of peaks to consider
+# ncore: An integer of how many cores parallel will use
+# ...: Additional arguments supplied to the scoring methods
+# returns a numeric vector the length of pc_gr of the gene binding scores
+
+
+binding_scores <- function(pc_gr, 
+                           peak_gr, 
+                           method, 
+                           max_dist = 1e6, 
+                           ncore = 1,
+                           ...) {
+  
+  stopifnot(class(pc_gr) == "GRanges", class(peak_gr) == "GRanges")
+  stopifnot(method %in% c("Ouyang", "Beta"))
+  
+  score_l <- mclapply(1:length(pc_gr), function(x) {
+    
+    dist <- GenomicRanges::distance(pc_gr[x], peak_gr, select = "all")
+    dist <- dist[!is.na(dist) & dist < max_dist]
+    
+    if (length(dist) == 0) {
+      return(0)
+    }
+    
+    if (method == "Ouyang") {
+      score <- ouyang(dist, ...)
+    } else {
+      score <- beta(dist, ...)
+    }
+  }, mc.cores = ncore)
+  
+  names(score_l) <- pc_gr$Symbol
+  
+  return(unlist(score_l))
 }
