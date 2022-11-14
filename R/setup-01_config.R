@@ -3,6 +3,8 @@
 ## TODO: collapsing meta paths/subdirs? (eg meta/chipseq/atlas append)
 ## TODO: schematic of ChIP-seq workflow
 ## TODO: input for pipeline install and fastq download better organized
+## TODO: ask about local vs utils functions
+## TODO: pathing of pipeout chip/
 
 
 # Variables of interest
@@ -30,8 +32,6 @@ pipeout_dir <-  "/cosmos/data/pipeline-output/chipseq-encode-pipeline/"
 
 # Expression platform info from Nathaniel Lim
 platform_path <- "/space/grp/nlim/CronGemmaDump/AD_Dump.TSV"
-
-
 
 # Scratch location where outputs were variably saved
 scratch_dir <- "/home/amorin/scratch/R_objects/"
@@ -61,6 +61,9 @@ meta_dir <- "/home/amorin/Data/Metadata/"
 bl_path_hg <- "/home/amorin/Data/Chromosome_info/blacklist_hg38.tsv"
 bl_path_mm <- "/home/amorin/Data/Chromosome_info/blacklist_mm10.tsv"
 
+# ENCODE candidate cis regulatory elements (cCREs)
+ccre_path_hg <- "/home/amorin/Data/Chromosome_info/cCREs_V3_hg38.bed"
+ccre_path_mm <- "/home/amorin/Data/Chromosome_info/cCREs_V3_mm10.bed"
 
 
 
@@ -68,15 +71,27 @@ bl_path_mm <- "/home/amorin/Data/Chromosome_info/blacklist_mm10.tsv"
 # ------------------------------------------------------------------------------
 
 
-# ChIP-seq genomic range objects
-gr_dir <- "~/Data/Annotated_objects/GRanges/"
+# Gene x experiment bind score matirces
+cmat_dir <- "/home/amorin/Data/Annotated_objects/Bind_matrices/Encpipe/"
 
+# ChIP-seq genomic range objects
+gr_dir <- "/home/amorin/Data/Annotated_objects/GRanges/"
 
 # Top level of ChIP-seq plot files
 cplot_dir <- "/home/amorin/Plots/Chipseq/"
 
 
-# c("GRanges/")
+# For trackplot
+# installing bwtools: https://gist.github.com/PoisonAlien/e19b482ac6146bfb03142a0de1c4fbc8
+# saved this in my own /home/user/bin, then added this dir to R path:
+
+bwtool_path <- "/home/amorin/bin/bwtool/"
+if (!grepl(Sys.getenv("PATH"), bwtool_path)) {
+  Sys.setenv(PATH = paste(Sys.getenv("PATH"), bwtool_path, sep = ":"))
+}
+
+
+# c("GRanges/", "Trackplots/")
 
 
 # Perturbation
