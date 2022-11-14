@@ -134,14 +134,6 @@ nearest_mm[nearest_mm == min(nearest_mm)]
 # ------------------------------------------------------------------------------
 
 
-summit_window <- function(gr, window_size) {
-  # Fix range to the summit position and pad with a fixed window
-  start(gr) <- end(gr) <- start(gr) + gr$Summit_from_start
-  gr <- gr + window_size
-  return(gr)
-}
-
-
 # re-size
 gr_rs_hg <- GRangesList(lapply(gr_hg, summit_window, window_size))
 gr_rs_mm <- GRangesList(lapply(gr_mm, summit_window, window_size))

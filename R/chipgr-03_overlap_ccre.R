@@ -112,14 +112,6 @@ all_ccre <- factor(
 
 window_size <- 0
 
-# Fix range to the summit position and pad with a fixed window
-
-summit_window <- function(gr, window_size) {
-  start(gr) <- end(gr) <- start(gr) + gr$Summit_from_start
-  gr <- gr + window_size
-  return(gr)
-}
-
 gr_rs_hg <- lapply(gr_hg, summit_window, window_size)
 gr_rs_mm <- lapply(gr_mm, summit_window, window_size)
 
