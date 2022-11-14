@@ -183,7 +183,8 @@ run_info <- run_info %>%
   left_join(.,
             meta_all[, c("Symbol", "Species", "Experiment_ID")],
             by = "Experiment_ID") %>%
-  distinct(.keep_all = TRUE)
+  distinct(.keep_all = TRUE) %>% 
+  arrange(Symbol)
 
 
 # Inspect/check the output to ensure everything is accounted for
