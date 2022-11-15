@@ -91,7 +91,7 @@ if (!grepl(Sys.getenv("PATH"), bwtool_path)) {
 }
 
 
-# c("GRanges/", "Trackplots/")
+# c("GRanges/", "Trackplots/", "Preprocess/", "Binding_similarity/")
 
 
 # Perturbation
