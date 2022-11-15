@@ -325,5 +325,3 @@ for (i in 1:length(plist4)) {
 # for (i in samp_genes[2:length(samp_genes)]) {
 #   lines(density(bs_norm_hg$QN_log[i,]))
 # }
-
-
