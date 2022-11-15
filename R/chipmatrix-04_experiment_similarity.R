@@ -7,25 +7,21 @@ library(cowplot)
 library(pheatmap)
 library(RColorBrewer)
 library(WGCNA)
-source("~/regnetR/R/utils/similarity_functions.R")
-source("~/regnetR/R/utils/plot_functions.R")
+source("R/setup-01_config.R")
+source("R/utils/similarity_functions.R")
+source("R/utils/plot_functions.R")
 
 topn <- 500 # how many of the top genes to keep
-date <- "Apr2022"  # most recent data freeze
-plot_dir <- "~/Plots/Chipseq/Binding_similarity/"  # plot export dir
-outfile <- paste0("~/scratch/R_objects/", date, "_chip_similarity_refseq.RDS")
+plot_dir <- paste0(cplot_dir, "Binding_similarity/")
+outfile <- paste0(scratch_dir, date, "_chip_similarity_refseq.RDS")
 
 # Loading ChIP-seq data
-intensity_flag <- FALSE  # use ouyang scores with or without macs2 intensity
 binary_dist <- 25e3  # distance threshold used for binary gene scores
-min_peaks <- 100  # how many peaks were required to keep an experiment
-peakset <- "idr"  # idr for TF (but overlap still for mecp2) or all overlap
-chip_dir <- "~/Data/Annotated_objects/Bind_matrices/Encpipe/" # bind matrix path
 chip_type <- "QN_log"  # which chip processing scheme to use
-meta <- read.delim(paste0("~/Data/Metadata/Chipseq/batch1_chip_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
-chip_hg <- readRDS(paste0(chip_dir, "Human_refseq_", date, "_processed_bindmat_list_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=", intensity_flag, "_binary=", binary_dist/1e3, "kb_peakset=", peakset, ".RDS"))
-chip_mm <- readRDS(paste0(chip_dir, "Mouse_refseq_", date, "_processed_bindmat_list_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=", intensity_flag, "_binary=", binary_dist/1e3, "kb_peakset=", peakset, ".RDS"))
-chip_ortho <- readRDS(paste0(chip_dir, "Ortho_refseq_", date, "_processed_bindmat_list_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=", intensity_flag, "_binary=", binary_dist/1e3, "kb_peakset=", peakset, ".RDS"))
+meta <- read.delim(paste0(meta_dir, "Chipseq/batch1_chip_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
+chip_hg <- readRDS(paste0(cmat_dir, "Human_refseq_", date, "_processed_bindmat_list_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=FALSE_binary=", binary_dist/1e3, "kb.RDS"))
+chip_mm <- readRDS(paste0(cmat_dir, "Mouse_refseq_", date, "_processed_bindmat_list_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=FALSE_binary=", binary_dist/1e3, "kb.RDS"))
+chip_ortho <- readRDS(paste0(cmat_dir, "Ortho_refseq_", date, "_processed_bindmat_list_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=FALSE_binary=", binary_dist/1e3, "kb.RDS"))
 
 
 # General workflow is to generate exp x exp matrices where elements represent
@@ -63,6 +59,7 @@ if (!file.exists(outfile)) {
 }
 
 
+
 # Summarize/inspect group similarities (focus on what is in paper)
 #-------------------------------------------------------------------------------
 
@@ -96,20 +93,36 @@ diff_geo_hg <- filter(df_list$Human, as.character(GEO1) != as.character(GEO2))
 diff_geo_mm <- filter(df_list$Mouse, as.character(GEO1) != as.character(GEO2))
 
 
-# Point out intra-vs-inter HES1 comparisons: higher K562 and MCF-7 similarity
-# between inter-HES1 pairs than intra-HES1
+# Point out intra-vs-inter HES1 comparisons: higher K562 and MCF-7 correlation
+# between inter-HES1 pairs than intra-HES1. However, intra-HES1 pairs have
+# higher top 500 overlap compared to any inter-HES1 pair.
+
 hes1_intra_hg <- df_list$Human %>%
   filter((as.character(TF1) == "Hes1" | as.character(TF2) == "Hes1") & Group == "In_TR_in_species")
+
+summary(hes1_intra_hg$Intersect)
+summary(hes1_intra_hg$Pcor)
 
 hes1_inter_hg <- df_list$Human %>%
   filter((as.character(TF1) == "Hes1" | as.character(TF2) == "Hes1") & Group == "Out") %>% 
   arrange(desc(Pcor))
+
+summary(hes1_inter_hg$Intersect)
+summary(hes1_inter_hg$Pcor)
 
 k562 <- filter(meta, Cell_Type == "K562")$Experiment_ID
 mcf7 <- filter(meta, Cell_Type == "MCF-7")$Experiment_ID
 
 hes1_k562 <- filter(hes1_inter_hg, Row %in% k562 & Col %in% k562) 
 hes1_mcf7 <- filter(hes1_inter_hg, Row %in% mcf7 & Col %in% mcf7) 
+
+# Example of ENCODE RUNX1 experiments in same cell type
+
+filter(
+  df_list$Human,
+  Col == "GSE91747_RUNX1_Human_K562-ENCODE-Ab1",
+  Row == "GSE96253_RUNX1_Human_K562-ENCODE-Ab2"
+)
 
 # Runx1 dominates cross species intra-TF comparisons
 
@@ -135,7 +148,6 @@ inter_gt <- df_list$Ortho %>%
 
 df <- data.frame(
   Symbol = rownames(chip_ortho$QN_log),
-  # Exp1 = chip_ortho$QN_log[, "GSE112315_Mef2c_Mouse_Day0"], 
   Exp1 = chip_ortho$QN_log[, "GSE139509_Mecp2_Mouse_Ab1-Mecp2-KO_HISTONE"],
   Exp2 = chip_ortho$QN_log[, "GSE32644_MEF2C_Human_Control"])
 
@@ -145,9 +157,13 @@ df <- df[df$Exp1 > 0.2 & df$Exp2 > 0.2, ]
 
 # Mecp2 example of decent raw/qn_log cor/overlap, but non-existant binary cor. 
 # Near max peaks, resulting in binary binding for almost every gene
-df <- data.frame(Exp1 = chip_ortho$Binary[, "GSE122364_MECP2_Human_GSK343_HISTONE"], 
-                 Exp2 = chip_ortho$Binary[, "GSE125585_Mecp2_Mouse_Control_HISTONE"])
-df <- arrange(df, desc(Exp1))
+
+df <- data.frame(
+  Exp1 = chip_ortho$Binary[, "GSE122364_MECP2_Human_GSK343_HISTONE"], 
+  Exp2 = chip_ortho$Binary[, "GSE125585_Mecp2_Mouse_Control_HISTONE"]
+  ) %>% 
+  dplyr::arrange(desc(Exp1))
+
 cor(df$Exp1, df$Exp2)
 plot(df$Exp1, df$Exp2)
 sum(df$Exp1 == 1)
