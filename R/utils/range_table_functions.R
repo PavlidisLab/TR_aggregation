@@ -305,7 +305,7 @@ binary_scores <- function(pc_gr, peak_gr, max_dist = 25e3) {
 
 ouyang <- function(distance, decay_constant = 5e3) {
   
-  stopifnot(is.integer(distance), length(distance) > 0)
+  stopifnot(is.numeric(distance), length(distance) > 0)
   
   scores <- lapply(distance, function(x) {
     exp(-(abs(x) / decay_constant))
@@ -326,7 +326,7 @@ ouyang <- function(distance, decay_constant = 5e3) {
 
 beta <- function(distance, base = 1e5) {
   
-  stopifnot(is.integer(distance), length(distance) > 0)
+  stopifnot(is.numeric(distance), length(distance) > 0)
   
   scores <- lapply(distance, function(x) {
     exp(-(0.5 + 4 * abs(x) / base))
