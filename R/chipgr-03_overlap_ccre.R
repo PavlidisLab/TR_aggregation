@@ -151,14 +151,16 @@ count_peaks_with_ccre <- function(exp_gr, ccre_gr) {
 # Convert count matrix to proportion
 
 count_to_prop <- function(count_mat) {
+  
   prop_mat <- count_mat
   prop_mat[, 1:ncol(prop_mat) - 1] <- prop_mat[, 1:ncol(prop_mat) - 1] / prop_mat[, "Count_peaks"]
+  
   return(prop_mat)
 }
 
 
 # Human: All experiments overlap at least one cCRE. On average, 21% of peaks from
-# original set did not overlap with a peak, 28% for resized at 1bp, 22% for 150bp
+# original set did not overlap with a peak, 28% for resized at 1bp, 22% for 150bp.
 # GSE125659_MECP2_Human_MECP2-OE-4x_HISTONE has the least overlap (94% summits 
 # no overlap with a cCRE). As expected, MECP2 on average has the most peaks not 
 # overlapping a cCRE (81%)
@@ -178,7 +180,6 @@ zero_by_tf_hg <- data.frame(peak_prop_hg) %>%
   left_join(meta[, c("Experiment_ID", "Symbol")], by = "Experiment_ID") %>%
   group_by(Symbol) %>%
   summarize(Mean_0 = mean(Count_0_overlapped))
-
 
 summary(peak_prop_hg[filter(meta_hg, Symbol != "MECP2")$Experiment_ID, "Count_0_overlapped"])
 summary(peak_prop_hg[filter(meta_hg, Symbol == "MECP2")$Experiment_ID, "Count_0_overlapped"])
@@ -207,11 +208,11 @@ zero_by_tf_mm <- data.frame(peak_prop_mm) %>%
   group_by(Symbol) %>%
   summarize(Mean_0 = mean(Count_0_overlapped))
 
-
 summary(peak_prop_mm[filter(meta_mm, Symbol != "Mecp2")$Experiment_ID, "Count_0_overlapped"])
 summary(peak_prop_mm[filter(meta_mm, Symbol == "Mecp2")$Experiment_ID, "Count_0_overlapped"])
 summary(peak_prop_mm[, "Count_0_overlapped"])
 summary(peak_prop_nors_mm[, "Count_0_overlapped"])
+
 
 # Find out how many data sets for each TR overlap each cCRE
 # ------------------------------------------------------------------------------
@@ -246,19 +247,19 @@ count_ccre_with_tf <- function(gr_query, gr_subject, meta, cores) {
 
 # Human
 ccre_by_tf_hg <- count_ccre_with_tf(ccre_hg, gr_rs_hg, meta_hg, cores)
-# ccre_by_tf_hg[order(ccre_by_tf_hg[, "ASCL1"], decreasing = TRUE),][1:30,]
-
 
 # Mouse
 ccre_by_tf_mm <- count_ccre_with_tf(ccre_mm, gr_mm, meta_mm, cores)
-# ccre_by_tf_mm[order(ccre_by_tf_mm[, "Ascl1"], decreasing = TRUE),][1:30,]
 
 
-# For each experiment, get the breakdown of overlap by cCRE group
+# For each experiment, get the breakdown of peak overlap over each cCRE group.
+
 # Note: The denominator of the proportion calculation is done by total peaks for
 # the given experiment, not how many total cCREs were overlapped. These will
 # be slightly different as resized experiments may still have a small minority
 # of peaks that are assigned to 2 cCREs due bordering each.
+
+
 # ------------------------------------------------------------------------------
 
 
@@ -294,7 +295,7 @@ group_count_hg <- count_mat_by_group(gr_rs_hg, ccre_hg, cores)
 group_count_hg <- 
   cbind(None = peak_count_hg[, "Count_0_overlapped"], group_count_hg)
 
-group_prop_hg <- group_count_hg / peak_count_hg[, "Count_peaks"]
+group_prop_hg <- group_count_hg / rowSums(group_count_hg)
 
 group_by_tf_hg <- data.frame(group_prop_hg) %>% 
   rownames_to_column(var = "Experiment_ID") %>% 
@@ -310,7 +311,7 @@ group_count_mm <- count_mat_by_group(gr_rs_mm, ccre_mm, cores)
 group_count_mm <- 
   cbind(None = peak_count_mm[, "Count_0_overlapped"], group_count_mm)
 
-group_prop_mm <- group_count_mm / peak_count_mm[, "Count_peaks"]
+group_prop_mm <- group_count_mm / rowSums(group_count_mm)
   
 group_by_tf_mm <- data.frame(group_prop_mm) %>% 
   rownames_to_column(var = "Experiment_ID") %>% 
@@ -319,22 +320,8 @@ group_by_tf_mm <- data.frame(group_prop_mm) %>%
   summarise(across(where(is.double), list(mean)))
 
 
-
 # Explore region x TF matrix and look at cCRE status of top bound regions
 # ------------------------------------------------------------------------------
-
-
-# Converts raw counts to the proportion of overlap respective to each TR
-
-count_to_prop <- function(count_mat, meta) {
-  
-  tf_count <- filter(meta) %>% 
-    count(Symbol) %>% 
-    arrange(Symbol, colnames(count_mat)) %>% 
-    pull(n)
-  
-  t(t(count_mat) / tf_count)
-}
 
 
 # Sort count_mat by tf column while minimizing the sum of the rest of the cols.
