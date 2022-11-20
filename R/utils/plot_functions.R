@@ -4,6 +4,7 @@
 library(tidyverse)
 library(pheatmap)
 library(cowplot)
+library(egg)
 library(RColorBrewer)
 library(ggsci)
 library(viridisLite)
@@ -132,7 +133,7 @@ dplot <- function(df,
                   stat_name,
                   species) {
   
-  if(species == "Human") {
+  if (species == "Human") {
     fill_col <- c("royalblue", "grey30")
     legend_text = c("Intra-TR", "Inter-TR")
   } else if (species == "Mouse") {
@@ -140,7 +141,9 @@ dplot <- function(df,
     legend_text = c("Intra-TR", "Inter-TR")
   } else if (species == "Ortho") {
     fill_col <- c("forestgreen", "mediumvioletred", "lightgrey")
-    legend_text = c("Intra-TR & within-species", "Intra-TR & cross-species", "Inter-TR (both species)")
+    legend_text = c("Intra-TR & within-species",
+                    "Intra-TR & cross-species",
+                    "Inter-TR (both species)")
   }
   
   
@@ -167,6 +170,123 @@ dplot <- function(df,
 # ------------------------------------------------------------------------------
 
 
+# Violin+Box plot of bind scores of provided genes across TFs
+
+
+bind_vboxplot <- function(mat, plot_genes, ncol = 1, species) {
+  
+  # Long df for plotting
+  all_df <- data.frame(mat[plot_genes, ]) %>% 
+    rownames_to_column(var = "Symbol") %>% 
+    reshape2::melt(id = "Symbol", var = "Experiment_ID")
+  
+  if (species == "Human") {
+    all_df$TF <- str_to_upper(str_split(all_df$Experiment_ID, "_", simplify = TRUE)[, 2])
+  } else if (species == "Mouse") {
+    all_df$TF <- str_split(all_df$Experiment_ID, "_", simplify = TRUE)[, 2]
+  }
+  
+  # List of plots (one gene per element) to be combined after
+  plot_list <- lapply(plot_genes, function(x) {
+    
+    gene_df <- filter(all_df, Symbol == x)
+    
+    # violin plot won't work for n < 3; use points instead
+    which_lt3 <- names(which(table(gene_df$TF) < 3))
+    
+    # Build plot
+    p <-
+      ggplot(gene_df, aes(x = TF, y = value)) +
+      geom_violin(data = gene_df[!(gene_df$TF %in% which_lt3),], 
+                  width = 0.6,
+                  fill = "lightslategrey") +
+      geom_boxplot(data = gene_df[!(gene_df$TF %in% which_lt3),], 
+                   width = 0.1,
+                   fill = "white") +
+      geom_point(data = gene_df[gene_df$TF %in% which_lt3,],
+                 shape = 21,
+                 colour = "black",
+                 fill = "lightslategrey") +
+      theme_classic() +
+      ggtitle(x) +
+      ylab("Binding score") +
+      theme(
+        axis.text = element_text(size = 20),
+        axis.title.y = element_text(size = 20),
+        axis.title.x = element_blank(),
+        plot.title = element_text(size = 20, hjust = 0.5, colour = "darkred")
+      )
+    
+    # Only want TF x axis labels on bottom plot
+    if (x == plot_genes[length(plot_genes)]) {
+      p <- p + theme(axis.text.x = element_text(angle = 90, vjust = 0.45))
+    } else {
+      p <- p + theme(axis.text.x = element_blank())
+    }
+    return(p)
+  })
+  
+  # egg:: preserves consistent plot panel sizing, unlike cowplot
+  return(egg::ggarrange(plots = plot_list, ncol = ncol))
+  
+}
+
+
+# Plot of the highest bound genes (topbound_symbols) across all experiments,
+# summarized in bind_df. Creates a scatter of continuous versus proportion 
+# binding, with text added to top 50 genes present in either. Also add vbplot of
+# the top genes beside this scatter.
+
+
+topbound_plot_df <- function(bind_df, topbound_symbols) {
+  
+  plot_df <- bind_df %>% 
+    mutate(
+      Group = Symbol %in% topbound_symbols,
+      Top = as.character(Symbol) %in% c(
+        as.character(slice_max(bind_df, Mean_bind, n = 50)$Symbol),
+        as.character(slice_max(bind_df, Proportion_binary, n = 50)$Symbol)
+      )) %>% 
+    arrange(desc(Proportion_binary))
+  
+  return(plot_df)
+}
+
+
+topbound_plot <- function(bind_df, 
+                          topbound_symbols, 
+                          bind_mat, 
+                          title, 
+                          species) {
+  
+  plot_df <- topbound_plot_df(bind_df, topbound_symbols)
+  
+  pa <- 
+    ggplot() +
+    geom_point(data = plot_df, 
+               aes(y = Proportion_binary, x = Mean_bind),
+               shape = 21, size = 2.3, alpha = 0.4, colour = "black") +
+    geom_text(data = filter(plot_df, Top),
+              check_overlap = TRUE,
+              aes(y = Proportion_binary, x = Mean_bind, label = Symbol)) +
+    ylab("Proportion of bound experiments (+/- 25kb)") +
+    xlab("Mean binding score") +
+    ggtitle(title) +
+    theme_classic() +
+    theme(
+      axis.text = element_text(size = 20),
+      axis.title = element_text(size = 20),
+      plot.title = element_text(size = 20, hjust = 0.5),
+      legend.position = "none"
+    )
+  
+  pb <- bind_vboxplot(mat = bind_mat, 
+                      plot_genes = topbound_symbols, 
+                      species = species)
+  
+  return(plot_grid(pa, pb, nrow = 1))
+  
+}
 
 
 
