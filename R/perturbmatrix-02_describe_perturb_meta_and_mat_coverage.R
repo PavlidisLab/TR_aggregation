@@ -111,7 +111,7 @@ identical(length(platforms), nrow(meta))
 
 tech <- unlist(lapply(platforms, function(x) {
   if (!(x %in% platform_meta$ad.Name)) {
-    return (NA)
+    return(NA)
   } else {
     platform_meta[platform_meta$ad.Name == x, "ad.TechType"]
   }
