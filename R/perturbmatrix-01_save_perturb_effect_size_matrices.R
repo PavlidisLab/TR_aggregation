@@ -8,6 +8,11 @@ library(parallel)
 source("R/setup-01_config.R")
 source("R/utils/gemma_functions.R")
 
+# Output is list of matrices of effect sizes
+outfile_hg <- paste0(pmat_dir, "human_list_perturb_matrix_", date, ".RDS")
+outfile_mm <- paste0(pmat_dir, "mouse_list_perturb_matrix_", date, ".RDS")
+outfile_ortho <- paste0(pmat_dir, "ortho_list_perturb_matrix_", date, ".RDS")
+
 # load meta and list of perturb experiments
 meta <- read.delim(file =  paste0(meta_dir, "batch1_tfperturb_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
 results <- readRDS(paste0(expr_dir, "TF_perturb_batch1_rslist_", date, ".RDS"))
@@ -128,6 +133,7 @@ mlist_ortho <- lapply(mlist_ortho, rm_all_na)
 
 
 # Save out
-saveRDS(mlist_hg, paste0(pmat_dir, "human_list_perturb_matrix_", date, ".RDS"))
-saveRDS(mlist_mm, paste0(pmat_dir, "mouse_list_perturb_matrix_", date, ".RDS"))
-saveRDS(mlist_ortho, paste0(pmat_dir, "ortho_list_perturb_matrix_", date, ".RDS"))
+
+saveRDS(mlist_hg, outfile_hg)
+saveRDS(mlist_mm, outfile_mm)
+saveRDS(mlist_ortho, outfile_ortho)
