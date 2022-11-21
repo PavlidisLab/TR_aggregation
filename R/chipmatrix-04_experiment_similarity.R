@@ -63,28 +63,19 @@ if (!file.exists(outfile)) {
 #-------------------------------------------------------------------------------
 
 
-focus_cols <- c("Group", "Pcor_Mean", "Pcor_Max", "Intersect_Mean", "Intersect_Max")
-
-all_summ <- lapply(df_list, get_summary)
-tf_summ <- lapply(df_list, tf_summary)
+focus_cols <- c("Group",
+                "Pcor_Mean",
+                "Pcor_Max",
+                "Intersect_Mean",
+                "Intersect_Max")
 
 # Group summaries by all experiments or TF-specific
-lapply(all_summ, `[`, focus_cols)
-lapply(tf_summ, function(tf) lapply(tf, `[`, focus_cols))
+all_summ <- lapply(df_list, function(x) get_summary(x)[, focus_cols])
+tf_summ <- lapply(df_list, tf_summary)
+tf_summ <- lapply(tf_summ, function(tf) lapply(tf, `[`, focus_cols))
 
-# top pairs by Pcor/Intersect
-top_pcor <- lapply(df_list, function(x) arrange(x, desc(Pcor)) %>% head(10))
-top_inter <- lapply(df_list, function(x) arrange(x, desc(Intersect)) %>% head(10))
-
-# split by df TF
-tf_df <- lapply(df_list, function(x) {
-  tfs <- unique(c(as.character(x$TF1), as.character(x$TF2)))
-  tf_list <- lapply(tfs, function(y) {
-    filter(x, as.character(TF1) == y & as.character(TF2) == y)
-  })
-  names(tf_list) <- tfs
-  return(tf_list)
-})
+# For inspecting individual TFs
+tf_list <- lapply(df_list, split_pair_df)
 
 
 # Top experiments from different GEOs
