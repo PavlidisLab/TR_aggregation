@@ -18,7 +18,6 @@ plot_dir <- paste0(cplot_dir, "Binding_summary/")
 outfile <- paste0(scratch_dir, date, "_refseq_bind_summary.RDS")
 
 # Loading ChIP-seq data
-binary_dist <- 25e3  # distance threshold used for binary gene scores
 chip_type <- "QN_log"  # which chip processing scheme to use
 meta <- read.delim(paste0(meta_dir, "Chipseq/batch1_chip_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
 chip_hg <- readRDS(paste0(cmat_dir, "Human_refseq_", date, "_processed_bindmat_list_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=FALSE_binary=", binary_dist/1e3, "kb.RDS"))

@@ -8,7 +8,6 @@ library(scales)
 library(cowplot)
 source("R/setup-01_config.R")
 
-binary_dist <- 25e3  # window size in base pairs to consider a peak->TSS assignment
 plot_dir <- paste0(cplot_dir, "Preprocess/")
 
 # ChIP-seq meta and QC info

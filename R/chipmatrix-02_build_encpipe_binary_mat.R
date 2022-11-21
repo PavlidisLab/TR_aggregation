@@ -7,7 +7,7 @@ library(parallel)
 source("R/setup-01_config.R")
 source("R/utils/range_table_functions.R")
 
-dist <- 25e3  # window size in base pairs to consider a peak->TSS assignment
+binary_dist <- 25e3  # window size in base pairs to consider a peak->TSS assignment
 
 pipeline_dir <- paste0(pipeout_dir, "chip/")
 
@@ -49,7 +49,7 @@ bl_mm <- bl_to_gr(read.delim(bl_path_mm, stringsAsFactors = FALSE))
 #-------------------------------------------------------------------------------
 
 
-load_and_score <- function(input_df, bl_gr, pc_gr, cores) {
+load_and_score <- function(input_df, bl_gr, pc_gr, cores, distance) {
   
   scores_l <- lapply(1:nrow(input_df), function(x) {
     
@@ -62,7 +62,7 @@ load_and_score <- function(input_df, bl_gr, pc_gr, cores) {
       peak_to_gr() %>%
       filter_blacklist(bl_gr)
     
-    scores <- binary_scores(pc_gr, peak_gr, dist)
+    scores <- binary_scores(pc_gr, peak_gr, distance)
     
     message(input_df$Experiment_ID[x], " complete ", Sys.time())
     return(scores)
@@ -75,10 +75,10 @@ load_and_score <- function(input_df, bl_gr, pc_gr, cores) {
 
 
 # Human
-mat_hg <- load_and_score(ids_hg, bl_hg, pc_hg, cores)
+mat_hg <- load_and_score(ids_hg, bl_hg, pc_hg, cores, binary_dist)
 
 # Mouse
-mat_mm <- load_and_score(ids_mm, bl_mm, pc_mm, cores)
+mat_mm <- load_and_score(ids_mm, bl_mm, pc_mm, cores, binary_dist)
 
 
 # Build ortho mat, using all experiments and 1:1 orthologs
@@ -115,17 +115,17 @@ stopifnot(identical(
 
 saveRDS(
   object = mat_hg,
-  file = paste0(cmat_dir, "binary_refseq_human_batch1_", date, "_", "distance=", dist/1e3, "kb.RDS")
+  file = paste0(cmat_dir, "binary_refseq_human_batch1_", date, "_", "distance=", binary_dist/1e3, "kb.RDS")
 )
 
 
 saveRDS(
   object = mat_mm,
-  file = paste0(cmat_dir, "binary_refseq_mouse_batch1_", date, "_", "distance=", dist/1e3, "kb.RDS")
+  file = paste0(cmat_dir, "binary_refseq_mouse_batch1_", date, "_", "distance=", binary_dist/1e3, "kb.RDS")
 )
 
 
 saveRDS(
   object = mat_ortho,
-  file = paste0(cmat_dir, "binary_refseq_ortho_batch1_", date, "_", "distance=", dist/1e3, "kb.RDS")
+  file = paste0(cmat_dir, "binary_refseq_ortho_batch1_", date, "_", "distance=", binary_dist/1e3, "kb.RDS")
 )
