@@ -11,8 +11,8 @@ source("R/utils/gemma_functions.R")
 source("R/utils/plot_functions.R")
 
 
-# FDR and FC cutoffs (FC for demonstration, not used in final analysis)
-fdr <- 0.1  
+# FC cutoff for demonstration, not used in final analysis.
+# fdr (false discovery rate control for DE) declared in config
 fc <- 1
 
 plot_dir <- paste0(pplot_dir, "Effect_size/")
@@ -22,13 +22,13 @@ meta <- read.delim(file =  paste0(meta_dir, "batch1_tfperturb_meta_final_", date
 results <- readRDS(paste0(expr_dir, "TF_perturb_batch1_rslist_", date, ".RDS"))
 results_unfilt <-  readRDS(paste0(expr_dir, "TF_perturb_batch1_unfiltered_rslist_", date, ".RDS"))
 
+stopifnot(identical(names(results), meta$Experiment_ID))
+
 
 # Extract the rows corresponding to the perturbed TF of interest. Also consider
 # the unfiltered results to check multi mapped probes
 # ------------------------------------------------------------------------------
 
-
-identical(names(results), meta$Experiment_ID)
 
 # init blank row to sub in for TFs missing data
 blank_result <- results[[1]][1, ]

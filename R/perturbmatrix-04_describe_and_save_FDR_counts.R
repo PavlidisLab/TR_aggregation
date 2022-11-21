@@ -10,9 +10,11 @@ source("R/setup-01_config.R")
 source("R/utils/perturbmatrix_functions.R")
 source("R/utils/plot_functions.R")
 
-fdr <- 0.1
-
 plot_dir <- paste0(pplot_dir, "Describe_FDR_counts/")
+
+# Output list of DE counts, grouped by TR or for all experiment combined
+tf_outfile <- paste0(expr_dir, "TF_perturb_DE_counts_list_by_TF_FDR01_", date, ".RDS")
+all_outfile <- paste0(expr_dir, "TF_perturb_DE_counts_list_all_FDR01_", date, ".RDS")
 
 # Load meta and lists of perturb effect size matrices
 meta <- read.delim(file =  paste0(meta_dir, "batch1_tfperturb_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
@@ -312,8 +314,9 @@ plot(context_df$Exp1, context_df$Exp2)
 
 
 # Save out
-saveRDS(all_de, file = paste0(expr_dir, "all_FDR=", fdr, "_counts_list_", date, ".RDS"))
-saveRDS(tf_de, file = paste0(expr_dir, "TF_FDR=", fdr, "_counts_list_", date, ".RDS"))
+
+saveRDS(all_de, file = tf_outfile)
+saveRDS(tf_de, file = tf_outfile)
 
 
 # Plots
@@ -324,7 +327,7 @@ saveRDS(tf_de, file = paste0(expr_dir, "TF_FDR=", fdr, "_counts_list_", date, ".
 
 p1a <- 
   ggplot(all_de$Human, aes(x = Count_DE)) +
-  geom_histogram(bins = max(all_de$Human$Count_DE+1), fill = "royalblue") +
+  geom_histogram(bins = max(all_de$Human$Count_DE + 1), fill = "royalblue") +
   geom_vline(xintercept = median(all_de$Human$Count_DE), col = "red") +
   theme_classic() +
   ylab("Count") +
