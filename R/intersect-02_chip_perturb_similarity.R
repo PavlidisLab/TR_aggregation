@@ -8,14 +8,14 @@ library(pheatmap)
 library(RColorBrewer)
 library(viridis)
 library(cowplot)
-source("~/regnetR/R/utils/similarity_functions.R")
-source("~/regnetR/R/utils/plot_functions.R")
+source("R/setup-01_config.R")
+source("R/utils/similarity_functions.R")
+source("R/utils/plot_functions.R")
 
 topn <- 500  # number of top genes to consider when doing overlap
 common_arg <- TRUE  # should comparison only be done for mutually measured genes?
-date <- "Apr2022"  # most recent data freeze
-outfile <- paste0("~/scratch/R_objects/", date, "_intersect_similarity.RDS")
-plot_dir <- "~/Plots/Intersect/"
+outfile <- paste0(scratch_dir, date, "_intersect_similarity.RDS")
+plot_dir <- paste0(iplot_dir, "Experiment_similarity/")
 
 # Loading all data
 dat <- readRDS(paste0("~/scratch/R_objects/", date, "_all_data_list.RDS"))
@@ -93,67 +93,96 @@ if (!file.exists(outfile)) {
 }
 
 
-
 # Summarize/inspect group similarities (focus on what is in paper)
 # GEO1/TF1/Row == ChIP-seq & GEO2/TF2/Col == Perturb
 #-------------------------------------------------------------------------------
 
 
-focus_cols <- c("Group", 
-                "Pval_Intersect_Mean", "Pval_Intersect_Max",
-                "Upreg_Intersect_Mean", "Upreg_Intersect_Max",
-                "Downreg_Intersect_Mean", "Downreg_Intersect_Max")
+focus_cols <- c(
+  "Group",
+  "Pval_Intersect_Mean",
+  "Pval_Intersect_Max",
+  "Upreg_Intersect_Mean",
+  "Upreg_Intersect_Max",
+  "Downreg_Intersect_Mean",
+  "Downreg_Intersect_Max"
+)
 
-all_summ <- lapply(df_list, get_summary)
-tf_summ <- lapply(df_list, tf_summary)
 
 # Group summaries by all experiments or TF-specific
-lapply(all_summ, `[`, focus_cols)
-lapply(tf_summ, function(tf) lapply(tf, `[`, focus_cols))
+all_summ <- lapply(df_list, function(x) get_summary(x)[, focus_cols])
+tf_summ <- lapply(df_list, tf_summary)
+tf_summ <- lapply(tf_summ, function(tf) lapply(tf, `[`, focus_cols))
 
-# top pairs by Pcor/Intersect
-top_inter <- lapply(df_list, function(x) arrange(x, desc(Pval_Intersect)) %>% head(10))
+# For inspecting within-TF dataframes of the overlap statistics
+tf_list <- lapply(df_list, split_pair_df)
 
-# split by df TF
-tf_df <- lapply(df_list, function(x) {
-  tfs <- unique(c(as.character(x$TF1), as.character(x$TF2)))
-  tf_list <- lapply(tfs, function(y) {
-    filter(x, as.character(TF1) == y & as.character(TF2) == y)
-  })
-  names(tf_list) <- tfs
-  return(tf_list)
-})
+# Example of genes found in the top mouse Mef2c overlap
+exp <- tf_list$Mouse$Mef2c %>% slice_max(Pval_Intersect)
+exp <- paste(exp$Row, exp$Col, sep = ":")
+top_genes <- sim_list$Mouse$Pval_Genes[exp]
+
+# Note that two ASCL1 overexpression constructs had elevated similarity with
+# other ASCL1 experiments, as well as a few TCF
+# sort(sim_list$Human$Pval_Intersect[, "GSE153823_ASCL1_Human_Overexpression"], decreasing = TRUE)
 
 
-# Function that returns tables tallying the count of times a gene
-# was found to overlapping for the requested TF and summary/statlist
+# Function that returns tables where columns are unique TFs in the summary
+# dataframe of paired experiment overlap statistics, rows are genes, and elements
+# are the integer count for how many times the given gene was in the topn 
+# overlap of the ChIP-seq and perturbation experiments for the given TR.
 # ------------------------------------------------------------------------------
 
 
-overlap_counts <- function(gene_list, pair_df, gene_mat) {
+overlap_counts <- function(gene_list, pair_df, gene_names) {
   
   tfs <- unique(c(as.character(pair_df$TF1), as.character(pair_df$Human$TF2)))
-  gene_vec <- setNames(rep(0, nrow(gene_mat)), rownames(gene_mat))
+  gene_vec <- setNames(rep(0, length(gene_names)), gene_names)
   
   counts <- lapply(tfs, function(x) {
+    
     tf_df <- filter(pair_df, TF1 == x & TF2 == x)
     pairs <- paste(tf_df$Row, tf_df$Col, sep = ":")
     gene_list <- gene_list[pairs]
     gene_count <- table(unlist(gene_list))
     gene_vec[names(gene_count)] <- gene_count
+    
     return(gene_vec)
   })
   
   mat <- do.call(cbind, counts)
   colnames(mat) <- tfs
+  rownames(mat) <- gene_names
+  
   return(mat)
 }
 
 
-count_hg <- overlap_counts(gene_list = sim_list$Human$Pval_Genes, pair_df = df_list$Human, gene_mat = dat$Binding$Human$Raw)
-count_mm <- overlap_counts(gene_list = sim_list$Mouse$Pval_Genes, pair_df = df_list$Mouse, gene_mat = dat$Binding$Mouse$Raw)
-count_ortho <- overlap_counts(gene_list = sim_list$Ortho$Pval_Genes, pair_df = df_list$Ortho, gene_mat = dat$Binding$Ortho$Raw)
+count_hg <- overlap_counts(
+  gene_list = sim_list$Human$Pval_Genes,
+  pair_df = df_list$Human,
+  gene_names = rownames(dat$Binding$Human$Raw)
+)
 
+
+count_mm <- overlap_counts(
+  gene_list = sim_list$Mouse$Pval_Genes,
+  pair_df = df_list$Mouse,
+  gene_names = rownames(dat$Binding$Mouse$Raw)
+)
+
+count_ortho <- overlap_counts(
+  gene_list = sim_list$Ortho$Pval_Genes,
+  pair_df = df_list$Ortho,
+  gene_names = rownames(dat$Binding$Ortho$Raw)
+)
+
+
+# Example of genes with most frequent overlap in human ASCL1
+
+top_ascl1 <- data.frame(count_hg) %>% 
+  rownames_to_column(var = "Target") %>% 
+  arrange(desc(Ascl1))
 
 
 # Plot
