@@ -11,6 +11,7 @@ plot_dir <- paste0(cplot_dir, "Describe_meta/")
 
 # meta final is what is used for analysis - filtered for min peaks and passing IDR/overlap
 # meta runs is all completed runs (including those under min peak) - used for plotting
+# meta all is all samples (row per sample) including those failing IDR/overlap
 meta_final <- read.delim(paste0(meta_dir, "Chipseq/batch1_chip_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
 meta_runs <- read.delim(paste0(meta_dir, "Chipseq/batch1_chip_meta_completed_withqc_", date, ".tsv"), stringsAsFactors = FALSE)
 meta_all <- read.delim(paste0(meta_dir, "Chipseq/batch1_chip_meta_all_", date, ".tsv"), stringsAsFactors = FALSE)
@@ -30,12 +31,12 @@ frac_runs_1sample <- sum(meta_final$Count_samples == 1)/n_runs
 # Count of samples by TF
 
 n_samps_species <- meta_final %>% 
-  mutate(Symbol = str_to_title(Symbol)) %>% 
+  mutate(Symbol = str_to_upper(Symbol)) %>% 
   group_by(Symbol, Species) %>% 
   dplyr::summarise(n = sum(Count_samples))
 
 n_samps_all <- meta_final %>% 
-  mutate(Symbol = str_to_title(Symbol)) %>% 
+  mutate(Symbol = str_to_upper(Symbol)) %>% 
   group_by(Symbol) %>% 
   dplyr::summarise(n = sum(Count_samples))
 
@@ -60,7 +61,7 @@ summary(runs_per_geo)
 # Failures for TF/non-Mecp2
 
 meta_all %>% 
-  filter(Complete != "1" & str_to_title(Symbol) != "Mecp2") %>% 
+  filter(Complete != "1" & str_to_upper(Symbol) != "MECP2") %>% 
   distinct(Experiment_ID, .keep_all = TRUE) %>% 
   dplyr::count(Complete)
 
@@ -68,7 +69,7 @@ meta_all %>%
 # Failures for Mecp2 histone mode
 
 meta_all %>% 
-  filter(Complete != "1" & str_to_title(Symbol) == "Mecp2") %>% 
+  filter(Complete != "1" & str_to_upper(Symbol) == "MECP2") %>% 
   filter(str_detect(Experiment_ID, "HISTONE")) %>% 
   distinct(Experiment_ID, .keep_all = TRUE) %>% 
   dplyr::count(Complete)
@@ -89,14 +90,14 @@ table(meta_final$Condition)
 # Sum of condition across samples broken down by TF
 
 meta_final %>% 
-  dplyr::mutate(Symbol = str_to_title(Symbol)) %>% 
+  dplyr::mutate(Symbol = str_to_upper(Symbol)) %>% 
   group_by(Symbol, Condition) %>% 
   summarise(n())
 
 # Ratio of condition by TF for experiments/runs
 
 meta_final %>%
-  dplyr::mutate(Symbol = str_to_title(Symbol)) %>% 
+  dplyr::mutate(Symbol = str_to_upper(Symbol)) %>% 
   group_by(Symbol, Condition) %>% 
   summarise(N = n()) %>% 
   dplyr::mutate(Ratio = round(N / sum(N), 2))
@@ -131,13 +132,13 @@ cor.test(meta_final$Avg_exp_mapped_reads_nodup, meta_final$N_peaks,
 
 # Wilcox reported in paper
 wilcox.test(meta_final$N_peaks ~ (meta_final$Count_input > 0))
-t.test(log10(meta_final$N_peaks+1) ~ (meta_final$Count_input > 0))
+t.test(log10(meta_final$N_peaks) ~ (meta_final$Count_input > 0))
 
 # difference in peak counts for +/- reps
 
 # Wilcox reported in paper
 wilcox.test(meta_final$N_peaks ~ (meta_final$Count_samples > 1))
-t.test(log10(meta_final$N_peaks+1) ~ (meta_final$Count_samples > 1))
+t.test(log10(meta_final$N_peaks) ~ (meta_final$Count_samples > 1))
 
 
 # Plot
@@ -162,18 +163,14 @@ p1 <- n_samps_species %>%
         legend.position = "bottom")
 
 
-ggsave(p1,
-       dpi = 300,
-       device = "png",
-       height = 10,
-       width = 12,
+ggsave(p1, dpi = 300, device = "png", height = 10, width = 12,
        file = paste0(plot_dir, "batch1_chip_sample_counts_all_", date, ".png"))
 
 
 # Count of experiments as stacked bar
 
-p2 <- meta_final %>% 
-  dplyr::mutate(Symbol = str_to_title(Symbol)) %>% 
+p2a <- meta_final %>% 
+  dplyr::mutate(Symbol = str_to_upper(Symbol)) %>% 
   distinct(Experiment_ID, .keep_all = TRUE) %>% 
   count(Symbol, Species) %>% 
   ggplot(., aes(x = reorder(Symbol, n), y = n, fill = Species)) +
@@ -190,33 +187,16 @@ p2 <- meta_final %>%
         legend.title = element_text(size = 15),
         legend.position = "bottom")
 
+# Coord flip - ultimately used in paper
 
-
-p2 <- meta_final %>%
-  dplyr::mutate(Symbol = str_to_title(Symbol)) %>%
-  distinct(Experiment_ID, .keep_all = TRUE) %>%
-  count(Symbol, Species) %>%
-  ggplot(., aes(y = reorder(Symbol, n), x = n, fill = Species)) +
-  geom_bar(stat = "identity", colour = "black", width = 0.8) +
-  xlab("Count of experiments") +
-  scale_x_continuous(limits = c(0, 150), breaks = seq(0, 150, 15)) +
-  theme_classic() +
-  scale_fill_manual(values = c("royalblue", "goldenrod")) +
+p2b <- p2a + 
+  coord_flip() +
+  ylab("Count of experiments") +
   theme(axis.title.y = element_blank(),
         axis.title.x = element_text(size = 30),
-        axis.text.y = element_text(size = 30),
-        axis.text.x = element_text(size = 30, angle = 60, vjust = 1, hjust = 1),
-        legend.text = element_text(size = 15),
-        legend.title = element_text(size = 15),
-        legend.position = "bottom")
+        legend.position = "none")
 
-
-
-ggsave(p2,
-       dpi = 300,
-       device = "png",
-       height = 10,
-       width = 12,
+ggsave(p2b, dpi = 300, device = "png", height = 10, width = 12,
        file = paste0(plot_dir, "batch1_chip_experiment_counts_all_", date, ".png"))
 
 
@@ -238,7 +218,7 @@ plot_jitter_median <- function(df, xvar, yvar, ylab, hline = NULL) {
     theme_classic() +
     theme(axis.title.x = element_blank(),
           axis.title.y = element_text(size = 25),
-          axis.text = element_text(size = 20),
+          axis.text = element_text(size = 18),
           legend.text = element_text(size = 20),
           legend.title = element_text(size = 20))
 }
@@ -247,47 +227,34 @@ plot_jitter_median <- function(df, xvar, yvar, ylab, hline = NULL) {
 # overlap counts ~  symbol 
 
 p3a <- meta_runs %>% 
-  dplyr::mutate(Symbol = str_to_title(Symbol),
+  dplyr::mutate(Symbol = str_to_upper(Symbol),
                 Peaks = log10(N_overlap_peaks)) %>% 
   plot_jitter_median(ylab = "Log10 count of overlap peaks", yvar = "Peaks", xvar = "Symbol")
 
 
-ggsave(p3a,
-       dpi = 300,
-       device = "png",
-       height = 8,
-       width = 12,
+ggsave(p3a, dpi = 300, device = "png", height = 8, width = 12,
        file = paste0(plot_dir, "batch1_chip_count_overlap_peaks_by_symbol_", date, ".png"))
-
 
 # IDR counts
 
 p3b <- meta_runs %>% 
-  dplyr::mutate(Symbol = str_to_title(Symbol),
+  dplyr::mutate(Symbol = str_to_upper(Symbol),
          Peaks = log10(N_IDR_peaks)) %>% 
   plot_jitter_median(ylab = "Log10 count of IDR peaks", yvar = "Peaks", xvar = "Symbol")
 
-ggsave(p3b,
-       dpi = 300,
-       device = "png",
-       height = 8,
-       width = 12,
+ggsave(p3b, dpi = 300, device = "png", height = 8, width = 12,
        file = paste0(plot_dir, "batch1_chip_count_IDR_peaks_by_symbol_", date, ".png"))
 
 # overlap for mecp2, IDR for TF (this is what is used in the paper)
 
 p3c <- meta_runs %>% 
-  dplyr::mutate(Symbol = str_to_title(Symbol),
+  dplyr::mutate(Symbol = str_to_upper(Symbol),
          Peaks = log10(N_peaks)) %>% 
   plot_jitter_median(ylab = "Log10 count of reproducible peaks",
                      yvar = "Peaks", xvar = "Symbol",
                      hline = log10(min_peaks))
 
-ggsave(p3c,
-       dpi = 300,
-       device = "png",
-       height = 8,
-       width = 12,
+ggsave(p3c, dpi = 300, device = "png", height = 8, width = 12,
        file = paste0(plot_dir, "batch1_chip_count_tf-idr_mecp2_overlap_peaks_by_symbol_", date, ".png"))
 
 
@@ -295,26 +262,22 @@ ggsave(p3c,
 
 
 p4 <- meta_final %>% 
-  dplyr::mutate(Symbol = str_to_title(Symbol),
-         Has_input = Count_input > 0) %>% 
+  dplyr::mutate(Symbol = str_to_upper(Symbol),
+                Has_input = Count_input > 0) %>% 
   ggplot(.) +
   geom_jitter(aes(x = Has_input, y = log10(N_peaks), fill = Symbol),
               color = "black", shape = 21, size = 2.5, width = 0.1) +
   stat_summary(aes(x = Has_input, y = log10(N_peaks)), 
                fun = median, fun.min = median, fun.max = median, 
-               geom = "crossbar", width = 0.3, inherit.aes = FALSE) +
+               geom = "crossbar", width = 0.4, inherit.aes = FALSE) +
   ylab("Log10 count of reproducible peaks") + 
   xlab("Has input control") +
-  scale_fill_manual(values = tf_pal) +
+  scale_fill_manual(values = tf_pal_hg) +
   theme_classic() +
   theme(axis.title = element_text(size = 20),
         axis.text = element_text(size = 20))
 
-ggsave(p4,
-       dpi = 300,
-       device = "png",
-       height = 6,
-       width = 4,
+ggsave(p4, dpi = 300, device = "png", height = 6, width = 4,
        file = paste0(plot_dir, "batch1_chip_count_tf-idr_mecp2_overlap_peaks_by_input_", date, ".png"))
 
 
@@ -337,11 +300,7 @@ p5a <- meta_final %>%
   theme(axis.title = element_text(size = 20),
         axis.text = element_text(size = 20))
 
-ggsave(p5a,
-       dpi = 300,
-       device = "png",
-       height = 6,
-       width = 6,
+ggsave(p5a, dpi = 300, device = "png", height = 6, width = 6,
        file = paste0(plot_dir, "batch1_chip_IDR_peaks_vs_avg_exp_mreads", date, ".png"))
 
 
@@ -359,11 +318,7 @@ p5b <- meta_final %>%
   theme(axis.title = element_text(size = 20),
         axis.text = element_text(size = 20))
 
-ggsave(p5b,
-       dpi = 300,
-       device = "png",
-       height = 6,
-       width = 6,
+ggsave(p5b, dpi = 300, device = "png", height = 6, width = 6,
        file = paste0(plot_dir, "batch1_chip_overlap_overlap_peaks_vs_avg_exp_mreads", date, ".png"))
 
 
@@ -371,7 +326,7 @@ ggsave(p5b,
 
 p5c <- meta_final %>%
   filter(!is.na(Avg_exp_mapped_reads_nodup) & !is.na(N_peaks)) %>%
-  dplyr::mutate(Symbol = str_to_title(Symbol)) %>% 
+  dplyr::mutate(Symbol = str_to_upper(Symbol)) %>% 
   ggplot(aes(y = log10(N_peaks), x = log10(Avg_exp_mapped_reads_nodup))) +
   geom_point() +
   geom_smooth(method = lm) +
@@ -381,9 +336,5 @@ p5c <- meta_final %>%
   theme(axis.title = element_text(size = 20),
         axis.text = element_text(size = 20))
 
-ggsave(p5c,
-       dpi = 300,
-       device = "png",
-       height = 6,
-       width = 6,
+ggsave(p5c, dpi = 300, device = "png", height = 6, width = 6,
        file = paste0(plot_dir, "batch1_chip_count_tf-idr_mecp2_overlap_peaks_vs_avg_exp_mreads", date, ".png"))
