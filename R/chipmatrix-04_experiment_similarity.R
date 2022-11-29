@@ -223,13 +223,13 @@ p3c <- dplot(df_list$Ortho, stat = "Pcor", stat_name = "Pearson correlation", sp
 
 
 ggsave(p3a, dpi = 300, device = "png", height = 6, width = 8,
-       filename = paste0(plot_dir, "Densplot_all_human_", date, ".png"))
+       filename = paste0(plot_dir, "Densplot_cor_all_human_", date, ".png"))
 
 ggsave(p3b, dpi = 300, device = "png", height = 6, width = 8,
-       filename = paste0(plot_dir, "Densplot_all_mouse_", date, ".png"))
+       filename = paste0(plot_dir, "Densplot_cor_all_mouse_", date, ".png"))
 
 ggsave(p3c, dpi = 300, device = "png", height = 6, width = 8,
-       filename = paste0(plot_dir, "Densplot_all_ortho_", date, ".png"))
+       filename = paste0(plot_dir, "Densplot_cor_all_ortho_", date, ".png"))
 
 
 # density plot of ortho with and w/o RUNX1
