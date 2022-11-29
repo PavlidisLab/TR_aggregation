@@ -1,4 +1,5 @@
-## Code for precision-recall analysis
+## Code for precision-recall analysis of gene ranking's ability to recover
+## curated targets.
 ## TODO: consider breaking up all exp AUPRC function
 ## TODO: collapse get_pr and get_vec_pr
 ## TODO: param doc
@@ -10,87 +11,61 @@ library(DescTools)
 library(parallel)
 
 
-# The following uses the ROCR package to extract the area under the precision
-# recall curve (AUPRC). The expected input is a data frame of TR-targets, ordered
-# by gene importance. Also include functionality to generate sampled AUPRCs
-# from an external df of curated targets.
-# ------------------------------------------------------------------------------
+# Uses the ROCR package to return a precision recall data frame where each entry
+# has the calculated P+R for the top k ranked genes presence in the curated
+# resource. Assumes that rank_df is ordered by the aggregated evidence
 
-
-
-get_pr <- function(df) {
+get_pr <- function(rank_df) {
   
-  # Uses the ROCR package to return a data frame of precision and recall, where
-  # each is calculated for every element/gene of df. 
-  
-  stopifnot("Curated_target" %in% colnames(df))
+  stopifnot("Curated_target" %in% colnames(rank_df))
   
   # positives/has curated evidence=1 negatives/no known evidence=0 
-  labels <- as.factor(as.numeric(df$Curated_target))
+  labels <- as.factor(as.numeric(rank_df$Curated_target))
   
   # convert ranks to monotonically decreasing scores representing rank importance
   scores <- 1/(1:length(labels))
   
   pred <- ROCR::prediction(predictions = scores, labels = labels)
   perf <- ROCR::performance(pred, measure = "prec", x.measure = "rec")
-  pr_df <- data.frame(Precision = unlist(perf@y.values), Recall = unlist(perf@x.values))
+  
+  pr_df <- data.frame(Precision = unlist(perf@y.values),
+                      Recall = unlist(perf@x.values))
+  
   return(pr_df)
 }
 
 
+# Uses the ROCR package to return return the area under the precision recall 
+# curve for the ordered ranking of genes in rank_df
 
-
-get_auprc <- function(df) {
+get_auprc <- function(rank_df) {
   
-  # Uses the ROCR package to return the area under the precision recall curve
-  # for the ordered ranking of gene in df as curated targets
-  
-  stopifnot("Curated_target" %in% colnames(df))
+  stopifnot("Curated_target" %in% colnames(rank_df))
   
   # positives/has curated evidence=1 negatives/no known evidence=0 
-  labels <- as.factor(as.numeric(df$Curated_target))
+  labels <- as.factor(as.numeric(rank_df$Curated_target))
   
   # convert ranks to monotonically decreasing scores representing rank importance
   scores <- 1/(1:length(labels))
   
   pred <- ROCR::prediction(predictions = scores, labels = labels)
   aupr <- performance(pred, measure = "aucpr")@y.values[[1]]
+  
   return(aupr)
 }
 
 
+# Get a list of PR data frames for the integrated, binding, and perturbation
+# rankings in rank_df
 
-get_all_auprc <- function(df) {
+get_all_pr <- function(rank_df) {
   
-  # Get a dataframe of AUPRCs for the aggregated, binding, and perturbation
-  # rankings in df
-  
-  stopifnot(c("Rank_integrated", "Rank_perturbation", "Rank_binding") %in% colnames(df))
+  stopifnot(c("Rank_integrated", "Rank_perturbation", "Rank_binding") %in% colnames(rank_df))
   
   # Order by respective rankings
-  df_int <- arrange(df, Rank_integrated)
-  df_bind <- arrange(df, Rank_binding)
-  df_perturb <- arrange(df, Rank_perturbation)
-  
-  data.frame(
-    Integrated = get_auprc(df_int),
-    Binding = get_auprc(df_bind),
-    Perturbation = get_auprc(df_perturb)
-  )
-}
-
-
-get_all_pr <- function(df) {
-  
-  # Get a list of PR data frames for the aggregated, binding, and perturbation
-  # rankings in df
-  
-  stopifnot(c("Rank_integrated", "Rank_perturbation", "Rank_binding") %in% colnames(df))
-  
-  # Order by respective rankings
-  df_int <- arrange(df, Rank_integrated)
-  df_bind <- arrange(df, Rank_binding)
-  df_perturb <- arrange(df, Rank_perturbation)
+  df_int <- arrange(rank_df, Rank_integrated)
+  df_bind <- arrange(rank_df, Rank_binding)
+  df_perturb <- arrange(rank_df, Rank_perturbation)
   
   list(
     Integrated = get_pr(df_int),
@@ -100,39 +75,55 @@ get_all_pr <- function(df) {
 }
 
 
+# Get a dataframe of AUPRCs for the integrated, binding, and perturbation
+# rankings in rank_df
 
-# The following generates sampled AUPRC values by using the original gene
-# rankings (integrated by default) and sampling targets from the data frame
-# of curated targets (lt_df)
-# ------------------------------------------------------------------------------
+get_all_auprc <- function(rank_df) {
+  
+  stopifnot(c("Rank_integrated", "Rank_perturbation", "Rank_binding") %in% colnames(rank_df))
+  
+  # Order by respective rankings
+  df_int <- arrange(rank_df, Rank_integrated)
+  df_bind <- arrange(rank_df, Rank_binding)
+  df_perturb <- arrange(rank_df, Rank_perturbation)
+  
+  data.frame(
+    Integrated = get_auprc(df_int),
+    Binding = get_auprc(df_bind),
+    Perturbation = get_auprc(df_perturb)
+  )
+}
 
 
-sample_target_auprc <- function(df, 
+# Generates a vector of sampled AUPRC values, using the original gene rankings
+# in rank_df and sampling size-matched targets from the data frame of curated 
+# targets (lt_df)
+
+sample_target_auprc <- function(rank_df, 
                                 lt_df, 
                                 reps = 1000, 
                                 mouse = FALSE,
-                                ncore = 8) {
+                                ncores = 1) {
   
-  # Get the AUPR for a random set of curated targets, equal in number to curated
-  # targets in df, sampling from all available targets in lt_df
-  
-  n_targets <- length(filter(df, Curated_target)$Symbol)
+  n_targets <- length(filter(rank_df, Curated_target)$Symbol)
   all_targets <- unique(str_to_upper(lt_df$Target_Symbol))
   
-  stopifnot(n_targets > 0 || length(all_targets) > 0)
-  
+  stopifnot(n_targets > 0, length(all_targets) > 0)
+
   # Hacky case matching for mouse  
   if (mouse) {
     all_targets <- str_to_title(all_targets)
-    all_targets <- all_targets[all_targets %in% df$Symbol]
+    all_targets <- all_targets[all_targets %in% rank_df$Symbol]
   }
   
   aupr <- mclapply(1:reps, function(x) {
+    
     # Replace curated target (labels) with sampled targets
     sample_targets <- sample(all_targets, size = n_targets, replace = FALSE)
-    df$Curated_target <- df$Symbol %in% sample_targets
-    get_auprc(df)
-  }, mc.cores = ncore)
+    rank_df$Curated_target <- rank_df$Symbol %in% sample_targets
+    get_auprc(rank_df)
+    
+  }, mc.cores = ncores)
   
   return(unlist(aupr))
 }
@@ -198,7 +189,8 @@ all_experiment_auprc <- function(tf,
                                  perturb_meta,
                                  bind_mat,
                                  perturb_mat,
-                                 ranking_list) {
+                                 ranking_list,
+                                 ncores = 1) {
   
   
   # isolate relevant TF-specific data
@@ -246,7 +238,7 @@ all_experiment_auprc <- function(tf,
       get_vec_auprc(ranking, targets)
       
     })
-  }, mc.cores = 8)
+  }, mc.cores = ncores)
   
   
   # Make rank product into long df with experiment IDs
