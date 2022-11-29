@@ -145,11 +145,13 @@ sum(is.na(seq_exp))
 
 # microarray platforms with most gene coverage
 
-exp_count_df <- data.frame(n_gene = c(exp_gene_counts$Human,
-                                      exp_gene_counts$Mouse)) %>% 
+exp_count_df <- data.frame(
+  n_gene = c(exp_gene_counts$Human,
+             exp_gene_counts$Mouse)) %>% 
   rownames_to_column("Experiment_ID")
 
-micro_count <- filter(meta, Platform_type == "Array") %>% 
+micro_count <- meta %>% 
+  filter(Platform_type == "Array") %>% 
   dplyr::select(Experiment_ID, Species, Platform) %>% 
   left_join(., y = exp_count_df, by = "Experiment_ID") 
 
@@ -159,11 +161,15 @@ micro_count <- filter(meta, Platform_type == "Array") %>%
 
 
 # Count of experiments as stacked bar
+# using same order as frequency of ChIP-seq experiments
 
-p1 <- meta %>% 
-  mutate(Symbol = str_to_title(Symbol)) %>% 
+tf_order <- rev(c("RUNX1", "MECP2", "ASCL1", "NEUROD1", "MEF2C", "PAX6", "TCF4", "HES1"))
+
+p1a <- meta %>% 
+  mutate(Symbol = str_to_upper(Symbol)) %>% 
   count(Symbol, Species) %>% 
-  ggplot(., aes(x = reorder(Symbol, n), y = n, fill = Species)) +
+  mutate(Symbol = factor(Symbol, levels = tf_order)) %>% 
+  ggplot(., aes(x = Symbol, y = n, fill = Species)) +
   geom_bar(stat = "identity", colour = "black", width = 0.8) +
   ylim(0, 100) +
   ylab("Count of experiments") +
@@ -172,22 +178,25 @@ p1 <- meta %>%
   theme(axis.title.x = element_blank(),
         axis.title.y = element_text(size = 30),
         axis.text.y = element_text(size = 30),
-        axis.text.x = element_text(size = 30, angle = 60, vjust = 1, hjust=1),
-        legend.text = element_text(size=15),
-        legend.title = element_text(size=15),
-        # legend.position="bottom")
-        legend.position="none")
+        axis.text.x = element_text(size = 30, angle = 60, vjust = 1, hjust = 1),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 15),
+        legend.position = "bottom")
+        
+# Coord flip - ultimately used in paper
 
-ggsave(p1, 
-       dpi = 300, 
-       device = "png", 
-       height = 10, 
-       width = 12, 
+p1b <- p1a + 
+  coord_flip() +
+  ylab("Count of experiments") +
+  theme(axis.title.y = element_blank(),
+        axis.title.x = element_text(size = 30),
+        legend.position = "none")
+  
+ggsave(p1b, dpi = 300, device = "png", height = 10, width = 12, 
        file = paste0(plot_dir, "batch1_tf_perturb_counts_", date, ".png"))
 
 
 # bar chart of sequencing technology and perturbation type
-
 
 p2a <- data.frame(tech_count) %>% 
   ggplot(., aes(x = Var1, y = Freq)) +
@@ -199,11 +208,7 @@ p2a <- data.frame(tech_count) %>%
         axis.text = element_text(size = 25),
         axis.title = element_text(size = 30))
 
-ggsave(p2a, 
-       dpi = 300, 
-       device = "png", 
-       height = 8, 
-       width = 6, 
+ggsave(p2a, dpi = 300, device = "png", height = 8, width = 6, 
        file = paste0(plot_dir, "batch1_tf_perturb_tech_counts_", date, ".png"))
 
 
@@ -217,13 +222,9 @@ p2b <- meta %>%
   theme(axis.title.x = element_blank(),
         axis.text = element_text(size = 25),
         axis.title = element_text(size = 30),
-        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 
-ggsave(p2b, 
-       dpi = 300, 
-       device = "png", 
-       height = 8, 
-       width = 6, 
+ggsave(p2b, dpi = 300, device = "png", height = 8, width = 6, 
        file = paste0(plot_dir, "batch1_tf_perturb_type_counts_", date, ".png"))
 
 
