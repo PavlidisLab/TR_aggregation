@@ -7,8 +7,6 @@ library(parallel)
 source("R/setup-01_config.R")
 source("R/utils/range_table_functions.R")
 
-binary_dist <- 25e3  # window size in base pairs to consider a peak->TSS assignment
-
 pipeline_dir <- paste0(pipeout_dir, "chip/")
 
 # Load metadata and link IDs to their corresponding directory
