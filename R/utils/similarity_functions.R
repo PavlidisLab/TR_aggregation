@@ -130,7 +130,7 @@ get_common <- function(vec1, vec2) {
 # Helper that takes rows of a paired df and uses mat to find out how many genes
 # were measured in common between the two experiments
 
-count_common <- function(df, mat, ncores) {
+count_common <- function(df, mat, ncores = 1) {
   
   l <- mclapply(1:nrow(df), function(x) {
     exp1 <- df$Row[x]
@@ -381,7 +381,8 @@ intersect_sim_list <- function(chip_mat,
 format_and_merge <- function(mat_list, 
                              gene_mat = NULL, 
                              add_common = FALSE,
-                             symmetric_arg = TRUE) {
+                             symmetric_arg = TRUE,
+                             ncores = 1) {
   
   stats <- names(mat_list)
   
@@ -441,5 +442,3 @@ tf_summary <- function(df) {
   
   return(tf_list)
 }
-
-
