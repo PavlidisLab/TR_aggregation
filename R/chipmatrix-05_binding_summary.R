@@ -70,7 +70,7 @@ meta_mm <- meta %>%
 meta_ortho <- meta %>% 
   filter(Experiment_ID %in% colnames(chip_ortho[[chip_type]])) %>% 
   distinct(Experiment_ID, .keep_all = TRUE) %>% 
-  mutate(Symbol = str_to_title(Symbol))
+  mutate(Symbol = str_to_upper(Symbol))
 
 
 # Gene wise summaries: mean bind score across experiments (+/- grouped by TR
@@ -632,7 +632,7 @@ p3 <- topbound_plot(bind_df = bind_all$Human,
                     species = "Human")
 
 
-ggsave(p3, dpi = 300, device = "png", width = 16, height = 8,
+ggsave(p3, dpi = 300, device = "png", width = 16, height = 8, bg = "white",
        filename = paste0(plot_dir, "Human_top_bound.png"))
 
 
@@ -646,5 +646,5 @@ p4 <- topbound_plot(bind_df = bind_all$Mouse,
                     species = "Mouse")
 
 
-ggsave(p4, dpi = 300, device = "png", width = 16, height = 8,
-       filename = paste0(plot_dir, "Human_top_bound.png"))
+ggsave(p4, dpi = 300, device = "png", width = 16, height = 8, bg = "white",
+       filename = paste0(plot_dir, "Mouse_top_bound.png"))
