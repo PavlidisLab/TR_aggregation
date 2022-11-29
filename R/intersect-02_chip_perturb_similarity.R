@@ -18,7 +18,7 @@ outfile <- paste0(scratch_dir, date, "_intersect_similarity.RDS")
 plot_dir <- paste0(iplot_dir, "Experiment_similarity/")
 
 # Loading all data
-dat <- readRDS(paste0("~/scratch/R_objects/", date, "_all_data_list.RDS"))
+dat <- readRDS(paste0(scratch_dir, date, "_all_data_list.RDS"))
 
 
 # General workflow is to generate exp x exp matrices where elements represent
