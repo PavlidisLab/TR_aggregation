@@ -15,16 +15,20 @@ library(viridisLite)
 
 # https://colorswall.com/palette/73/
 
-tf_pal = c(
-  Ascl1 = "#00188f",
-  Hes1 = "#fff100",
-  Mecp2 = "#009e49",
-  Mef2c = "#00bcf2",
-  Neurod1 = "#68217a",
-  Pax6 = "#ffd8b1",
-  Runx1 = "#e81123",
-  Tcf4 = "#ff8c00"
+tf_pal_hg = c(
+  ASCL1 = "#00188f",
+  HES1 = "#fff100",
+  MECP2 = "#009e49",
+  MEF2C = "#00bcf2",
+  NEUROD1 = "#68217a",
+  PAX6 = "#ffd8b1",
+  RUNX1 = "#e81123",
+  TCF4 = "#ff8c00"
 )
+
+
+tf_pal_mm <- tf_pal_hg
+names(tf_pal_mm) <- str_to_title(names(tf_pal_mm))
 
 
 pert_pal <- ggsci::pal_npg("nrc")(4)
@@ -46,14 +50,15 @@ depr_pal <- rev(magma(n = 11))
 
 
 
+
 # General functions
 # ------------------------------------------------------------------------------
 
 
 # For better handling of integer axis breaks
+# https://stackoverflow.com/questions/15622001/how-to-display-only-integer-values-on-an-axis-using-ggplot2
 
 pretty_breaks <- function(x) {
-  # https://stackoverflow.com/questions/15622001/how-to-display-only-integer-values-on-an-axis-using-ggplot2
   unique(floor(pretty(seq(0, (max(x) + 1) * 1.1))))
 }
 
@@ -238,14 +243,14 @@ bind_vboxplot <- function(mat, plot_genes, ncol = 1, species) {
 # the top genes beside this scatter.
 
 
-topbound_plot_df <- function(bind_df, topbound_symbols) {
+topbound_plot_df <- function(bind_df, topbound_symbols, topn = 50) {
   
   plot_df <- bind_df %>% 
     mutate(
       Group = Symbol %in% topbound_symbols,
       Top = as.character(Symbol) %in% c(
-        as.character(slice_max(bind_df, Mean_bind, n = 50)$Symbol),
-        as.character(slice_max(bind_df, Proportion_binary, n = 50)$Symbol)
+        as.character(slice_max(bind_df, Mean_bind, n = topn)$Symbol),
+        as.character(slice_max(bind_df, Proportion_binary, n = topn)$Symbol)
       )) %>% 
     arrange(desc(Proportion_binary))
   
