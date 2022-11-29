@@ -45,23 +45,49 @@ mlist_ortho <- readRDS(paste0(pmat_dir, "ortho_list_perturb_matrix_", date, ".RD
 if (!file.exists(outfile)) {
   
   sim_list <- list(
-    Human = perturb_sim_list(fc_mat = mlist_hg$FC_mat, pval_mat = mlist_hg$Pval_mat, topn = topn),
-    Mouse = perturb_sim_list(fc_mat = mlist_mm$FC_mat, pval_mat = mlist_mm$Pval_mat, topn = topn),
-    Ortho = perturb_sim_list(fc_mat = mlist_ortho$FC_mat, pval_mat = mlist_ortho$Pval_mat, topn = topn))
+    Human = perturb_sim_list(
+      fc_mat = mlist_hg$FC_mat,
+      pval_mat = mlist_hg$Pval_mat,
+      topn = topn
+      ),
+    Mouse = perturb_sim_list(
+      fc_mat = mlist_mm$FC_mat,
+      pval_mat = mlist_mm$Pval_mat,
+      topn = topn
+    ),
+    Ortho = perturb_sim_list(
+      fc_mat = mlist_ortho$FC_mat,
+      pval_mat = mlist_ortho$Pval_mat,
+      topn = topn
+    )
+  )
   
   df_list <- list(
-    Human = format_and_merge(sim_list$Human, gene_mat = mlist_hg$FC_mat, add_common = TRUE),
-    Mouse = format_and_merge(sim_list$Mouse, gene_mat = mlist_mm$FC_mat, add_common = TRUE),
-    Ortho = format_and_merge(sim_list$Ortho, gene_mat = mlist_ortho$FC_mat, add_common = TRUE))
+    Human = format_and_merge(
+      sim_list$Human,
+      gene_mat = mlist_hg$FC_mat,
+      add_common = TRUE
+    ),
+    Mouse = format_and_merge(
+      sim_list$Mouse,
+      gene_mat = mlist_mm$FC_mat,
+      add_common = TRUE
+    ),
+    Ortho = format_and_merge(
+      sim_list$Ortho,
+      gene_mat = mlist_ortho$FC_mat,
+      add_common = TRUE
+    )
+  )
   
   saveRDS(list(sim_list = sim_list, df_list = df_list), file = outfile)
   
 } else {
   
-  dat <- readRDS(outfile)
-  df_list <- dat$df_list
-  sim_list <- dat$sim_list
-  rm(dat)
+  temp_dat <- readRDS(outfile)
+  df_list <- temp_dat$df_list
+  sim_list <- temp_dat$sim_list
+  rm(temp_dat)
   
 }
 
