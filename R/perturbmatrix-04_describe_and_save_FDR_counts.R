@@ -50,7 +50,7 @@ na_filter <- function(df, qtl = 0.25) {
 
 
 # For all experiments and for each TF, get a data frame of 
-# 1) DE counts/fraction measured/NA counts; 
+# 1) DE counts/proportion measured/NA counts; 
 # 2) The count of times a gene was up/down in each of GoF and LoF experiments; 
 # 3) Whether the counts were consistent in direction between LoF and GoFs;
 # 4) The GoF/LoF class purity; 
@@ -133,15 +133,14 @@ all_na_summ <- lapply(all_de, function(x) summary(x$Count_NA))
 
 # Correlation of DE prior and DE count
 
-cor.test(
-  all_de$Human[!is.na(all_de$Human$DE_Prior_Rank), "DE_Prior_Rank"],
-  all_de$Human[!is.na(all_de$Human$DE_Prior_Rank), "Count_DE"]
-)
+cor.test(all_de$Human$DE_Prior_Rank,
+         all_de$Human$Count_DE,
+         use = "pairwise.complete.obs")
 
-cor.test(
-  all_de$Mouse[!is.na(all_de$Mouse$DE_Prior_Rank), "DE_Prior_Rank"],
-  all_de$Mouse[!is.na(all_de$Mouse$DE_Prior_Rank), "Count_DE"]
-)
+
+cor.test(all_de$Mouse$DE_Prior_Rank,
+         all_de$Mouse$Count_DE,
+         use = "pairwise.complete.obs")
 
 
 # Genes with max DE counts across all experiments
@@ -315,7 +314,7 @@ plot(context_df$Exp1, context_df$Exp2)
 
 # Save out
 
-saveRDS(all_de, file = tf_outfile)
+saveRDS(all_de, file = all_outfile)
 saveRDS(tf_de, file = tf_outfile)
 
 
@@ -323,7 +322,7 @@ saveRDS(tf_de, file = tf_outfile)
 #-------------------------------------------------------------------------------
 
 
-# Hists for count DE + fraction measured
+# Hists for count DE + proportion measured
 
 p1a <- 
   ggplot(all_de$Human, aes(x = Count_DE)) +
@@ -339,12 +338,12 @@ p1a <-
 
 
 p1b <- 
-  ggplot(all_de$Human, aes(x = Fraction_DE_measured)) +
+  ggplot(all_de$Human, aes(x = Proportion_DE_measured)) +
   geom_histogram(bins = 51, fill = "royalblue") +
-  geom_vline(xintercept = median(all_de$Human$Fraction_DE_measured), col = "red") +
+  geom_vline(xintercept = median(all_de$Human$Proportion_DE_measured), col = "red") +
   theme_classic() +
   ylab("Count") +
-  xlab(paste0("Fraction DE of measured (FDR < ", fdr, ")")) +
+  xlab(paste0("Proportion DE of measured (FDR < ", fdr, ")")) +
   ggtitle("Human") +
   theme(axis.text = element_text(size = 25),
         axis.title = element_text(size = 25),
@@ -352,7 +351,7 @@ p1b <-
 
 p1c <- 
   ggplot(all_de$Mouse, aes(x = Count_DE)) +
-  geom_histogram(bins = max(all_de$Mouse$Count_DE+1), fill = "goldenrod") +
+  geom_histogram(bins = max(all_de$Mouse$Count_DE + 1), fill = "goldenrod") +
   geom_vline(xintercept = median(all_de$Mouse$Count_DE), col = "red") +
   theme_classic() +
   ylab("Count") +
@@ -364,9 +363,9 @@ p1c <-
 
 
 p1d <- 
-  ggplot(all_de$Mouse, aes(x = Fraction_DE_measured)) +
+  ggplot(all_de$Mouse, aes(x = Proportion_DE_measured)) +
   geom_histogram(bins = 51, fill = "goldenrod") +
-  geom_vline(xintercept = median(all_de$Mouse$Fraction_DE_measured), col = "red") +
+  geom_vline(xintercept = median(all_de$Mouse$Proportion_DE_measured), col = "red") +
   theme_classic() +
   ylab("Count") +
   xlab(paste0("Fraction DE of measured (FDR < ", fdr, ")")) +
@@ -379,28 +378,17 @@ p1d <-
 p1 <- plot_grid(p1a, p1b, p1c, p1d, nrow = 2)
 
 ggsave(p1, height = 14, width = 20, dpi = 300, device = "png",
-       filename = paste0(plot_dir, "hist_countde_fracde_FDR=", fdr, "_", date, ".png"))
+       filename = paste0(plot_dir, "hist_countde_propde_FDR=", fdr, "_", date, ".png"))
 
 
 # plot relationship between total counts and DE prior ranking
-
 
 # Human
 
 p2a <- 
   filter(all_de$Human, !is.na(DE_Prior_Rank)) %>% 
   ggplot(., aes(x = Count_DE, y = DE_Prior_Rank)) +
-  geom_jitter(shape = 19, alpha = 0.2) +
-  theme_classic() +
-  theme(axis.text = element_text(size = 25),
-        axis.title = element_text(size = 25))
-
-p2a <- ggMarginal(p2a, type = "histogram", fill = "royalblue")
-
-p2b <- 
-  filter(all_de$Human, !is.na(DE_Prior_Rank)) %>% 
-  ggplot(., aes(x = Count_DE, y = DE_Prior_Rank)) +
-  geom_bin2d(bins = max(all_de$Human$Count_DE+1)) +
+  geom_bin2d(bins = max(all_de$Human$Count_DE + 1)) +
   geom_smooth(method = "lm", col = "black", se = FALSE) + 
   theme_classic() +
   ylab("DE prior rank") +
@@ -413,13 +401,13 @@ p2b <-
         legend.text = element_text(size = 25),
         legend.title = element_text(size = 25))
 
-p2b_noleg <- p2b + theme(legend.position = "none")
+p2a_noleg <- p2a + theme(legend.position = "none")
 
 
-ggsave(p2b, height = 8, width = 10, dpi = 300, device = "png",
+ggsave(p2a, height = 8, width = 10, dpi = 300, device = "png",
        filename = paste0(plot_dir, "prior_decount_bin_human_FDR=", fdr, "_", date, ".png"))
 
-ggsave(p2b_noleg, height = 8, width = 10, dpi = 300, device = "png",
+ggsave(p2a_noleg, height = 8, width = 10, dpi = 300, device = "png",
        filename = paste0(plot_dir, "prior_decount_bin_human_nolegend_FDR=", fdr, "_", date, ".png"))
 
 
@@ -428,53 +416,48 @@ ggsave(p2b_noleg, height = 8, width = 10, dpi = 300, device = "png",
 p3a <- 
   filter(all_de$Mouse, !is.na(DE_Prior_Rank)) %>% 
   ggplot(., aes(x = Count_DE, y = DE_Prior_Rank)) +
-  geom_jitter(shape = 19, alpha = 0.2) +
-  theme_classic() +
-  theme(axis.text = element_text(size = 25),
-        axis.title = element_text(size = 25))
-
-p3a <- ggMarginal(p3a, type = "histogram", fill = "goldenrod")
-
-p3b <- 
-  filter(all_de$Mouse, !is.na(DE_Prior_Rank)) %>% 
-  ggplot(., aes(x = Count_DE, y = DE_Prior_Rank)) +
-  geom_bin2d(bins = max(all_de$Mouse$Count_DE)+1) +
+  geom_bin2d(bins = max(all_de$Mouse$Count_DE) + 1) +
   geom_smooth(method = "lm", col = "black", se = FALSE) + 
   theme_classic() +
   ylab("DE prior rank") +
   xlab(paste0("Count DE (FDR < ", fdr, ")")) +
   ggtitle("Mouse") +
-  # scale_fill_gradientn(colors = hex_colors(11), name = "Count per bin") +
   scale_fill_gradient(low = "lightgrey", high = "black", name = "Count per bin") +
   theme(axis.text = element_text(size = 25),
         axis.title = element_text(size = 25),
         plot.title = element_text(size = 25),
         legend.text = element_text(size = 25),
-        legend.title = element_text(size = 25))
+        legend.title = element_text(size = 25),
+        plot.margin = margin(10, 20, 10, 10))
 
-p3b_noleg <- p3b + theme(legend.position = "none")
+p3a_noleg <- p3a + theme(legend.position = "none")
 
-ggsave(p3b, height = 8, width = 10, dpi = 300, device = "png",
+ggsave(p3a, height = 8, width = 10, dpi = 300, device = "png",
        filename = paste0(plot_dir, "prior_decount_bin_mouse_FDR=", fdr, "_", date, ".png"))
 
-ggsave(p3b_noleg, height = 8, width = 10, dpi = 300, device = "png",
+ggsave(p3a_noleg, height = 8, width = 10, dpi = 300, device = "png",
        filename = paste0(plot_dir, "prior_decount_bin_mouse_nolegend_FDR=", fdr, "_", date, ".png"))
 
 
 # Example of human genes with highest Count DE in relation to DE prior
 
 
+top_genes <- all_de$Human %>% 
+  arrange(desc(Count_DE)) %>%
+  slice_head(n = 2) %>% 
+  pull(Symbol)
+
 p4a <- all_de$Human %>% 
-  mutate(Max_count = Count_DE == max(Count_DE)) %>% 
+  mutate(Top_count = Symbol %in% top_genes) %>% 
   ggplot() +
   geom_point(aes(x = Count_DE, y = DE_Prior_Rank), 
-             data = . %>% filter(Max_count),
+             data = . %>% filter(Top_count),
              fill = "blue", size = 3.5, shape = 21) +
   geom_jitter(aes(x = Count_DE, y = DE_Prior_Rank), 
-              data = . %>% filter(!Max_count),
+              data = . %>% filter(!Top_count),
               shape = 21, size = 1, alpha = 0.4, width = 0.1, height = 0.1) +
   geom_text_repel(aes(x = Count_DE, y = DE_Prior_Rank, label = Symbol),
-                  data = . %>% filter(Max_count),
+                  data = . %>% filter(Top_count),
                   force = 0.5, force_pull = 0.5, size = 5) +
   theme_classic() +
   xlab("Count DE FDR < 0.1") +
@@ -485,27 +468,23 @@ p4a <- all_de$Human %>%
         axis.title = element_text(size = 25),
         plot.title = element_text(size = 25))
 
-
-max_count <- filter(all_de$Human, Count_DE == max(Count_DE))
-
-
-max_list <- lapply(max_count$Symbol, function(x) {
+top_list <- lapply(top_genes, function(x) {
   data.frame(
     FC = mlist_hg$FC_mat[x, ],
     DE = mlist_hg$FDR_mat[x, ] < fdr,
     TR = meta_hg$Symbol)
 })
-names(max_list) <- max_count$Symbol
+names(top_list) <- top_genes
 
 
-p4_list <- lapply(names(max_list), function(x) {
+p4_list <- lapply(names(top_list), function(x) {
   
   ggplot() +
     geom_jitter(aes(x = TR, y = FC, fill = DE),
-                data = filter(max_list[[x]], !DE),
+                data = filter(top_list[[x]], !DE),
                 shape = 21, size = 3, width = 0.1, height = 0.1) +
     geom_jitter(aes(x = TR, y = FC, fill = DE),
-                data = filter(max_list[[x]], DE),
+                data = filter(top_list[[x]], DE),
                 shape = 21, size = 3, width = 0.1, height = 0.1) +
     scale_fill_manual(values = c("white", "red")) +
     ggtitle(x) +
@@ -521,54 +500,97 @@ p4_list <- lapply(names(max_list), function(x) {
 
 p4b <- plot_grid(plotlist = p4_list, ncol = 1)
 
-
 p4 <- plot_grid(p4a, p4b, ncol = 2, rel_widths = c(1.5, 1), scale = 0.9)
 
-
-ggsave(p4, height = 9, width = 14, dpi = 300, device = "png",
+ggsave(p4, height = 9, width = 14, dpi = 300, device = "png", bg = "white",
        filename = paste0(plot_dir, "human_max_countde_vs_deprior_", date, ".png"))
 
 
 # TF-specific barcharts of count DE
 
 
-plot_tf_hist <- function(tf_list, meta, species) {
+# plot_tf_hist <- function(tf_list, meta, species, tf_pal) {
+#   
+#   tfs <- names(tf_list)
+#   
+#   for (tf in tfs) {
+#     
+#     plot_df <- tf_list[[tf]]
+#     n_tf <- nrow(filter(meta, Species == species & Symbol == tf))
+#     bins <- max(plot_df$Count_DE + 1)
+#     
+#     p <- 
+#       ggplot(plot_df, aes(x = Count_DE)) +
+#       geom_histogram(bins = bins, fill = tf_pal[tf]) +
+#       theme_classic() +
+#       ylab("Count of genes") +
+#       xlab(paste0("Count DE (FDR < ", fdr, ")")) +
+#       ggtitle(paste0(tf, " n=", n_tf)) +
+#       scale_x_continuous(breaks = pretty_breaks) +
+#       theme(axis.text = element_text(size = 35),
+#             axis.title = element_text(size = 30),
+#             plot.title = element_text(size = 35))
+# 
+#     ggsave(p, dpi = 300, device = "png", height = 6, width = 6,
+#            filename = paste0(plot_dir, species, "_", tf, "_decounts_FDR=", fdr, "_", date, ".png"))
+#     
+#   }
+#   
+# }
+
+plot_tf_hist <- function(tf_list, meta, species, tf_pal) {
   
   tfs <- names(tf_list)
   
-  for (tf in tfs) {
+  p_l <- lapply(tfs, function(tf) {
     
     plot_df <- tf_list[[tf]]
     n_tf <- nrow(filter(meta, Species == species & Symbol == tf))
-    bins <- max(plot_df$Count_DE+1)
+    bins <- max(plot_df$Count_DE + 1)
     
-    p <- 
-      ggplot(plot_df, aes(x = Count_DE)) +
-      geom_histogram(bins = bins, fill = tf_pal[str_to_title(tf)]) +
+    ggplot(plot_df, aes(x = Count_DE)) +
+      geom_histogram(bins = bins, fill = tf_pal[tf]) +
       theme_classic() +
       ylab("Count of genes") +
-      xlab(paste0("Count DE (FDR < ", fdr, ")")) +
+      xlab("Count DE") +
       ggtitle(paste0(tf, " n=", n_tf)) +
       scale_x_continuous(breaks = pretty_breaks) +
-      theme(axis.text = element_text(size = 35),
-            axis.title = element_text(size = 30),
-            plot.title = element_text(size = 35))
-
-    ggsave(p, dpi = 300, device = "png", height = 6, width = 6,
-           filename = paste0(plot_dir, species, "_", tf, "_decounts_FDR=", fdr, "_", date, ".png"))
-    
-  }
+      theme(
+        axis.text = element_text(size = 30),
+        axis.title = element_text(size = 30),
+        plot.title = element_text(size = 35),
+        plot.margin = margin(10, 15, 10, 10))
+  })
+  names(p_l) <- tfs
   
+  return(p_l)
 }
 
 
 # Running saves individual hist plots for each TF to plot dir
-plot_tf_hist(tf_list = tf_de$Human, meta = meta, species = "Human")
-plot_tf_hist(tf_list = tf_de$Mouse, meta = meta, species = "Mouse")
+# plot_tf_hist(tf_list = tf_de$Human, meta = meta, species = "Human", tf_pal = tf_pal_hg)
+# plot_tf_hist(tf_list = tf_de$Mouse, meta = meta, species = "Mouse", tf_pal = tf_pal_mm)
 
+
+# Running saves individual hist plots for each TF to plot dir
+p5a_list <- plot_tf_hist(tf_list = tf_de$Human, meta = meta, species = "Human", tf_pal = tf_pal_hg)
+p5b_list <- plot_tf_hist(tf_list = tf_de$Mouse, meta = meta, species = "Mouse", tf_pal = tf_pal_mm)
+
+a <- plot_grid(plotlist = p5a_list[-1], nrow = 1)
+b <- plot_grid(plotlist = p5b_list[-1], nrow = 1)
+c <- plot_grid(a, b, nrow = 2)
+
+
+ggsave(p5a_list$ASCL1, dpi = 300, device = "png", height = 6, width = 6,
+       filename = paste0(plot_dir, "Human_ASCL1_hist_decounts_FDR=", fdr, "_", date, ".png"))
+
+ggsave(p5b_list$Ascl1, dpi = 300, device = "png", height = 6, width = 6,
+       filename = paste0(plot_dir, "Mouse_Ascl1_hist_decounts_FDR=", fdr, "_", date, ".png"))
+
+ggsave(c, dpi = 300, device = "png", height = 12, width = 40,
+       filename = paste0(plot_dir, "TF_hist_decounts_FDR=", fdr, "_", date, ".png"))
 
 # Scatter of Purity ~ Count DE 
-
 
 purity_scatter <- function(tf_list,
                            species,
@@ -694,15 +716,15 @@ min_hg_plot <- pur_bplot_hg[intersect(min_tr$Symbol, names(pur_bplot_hg))]
 min_mm_plot <- pur_bplot_mm[intersect(min_tr$Symbol, names(pur_bplot_mm))]
 
 ggsave(plot_grid(plotlist = pur_bplot_hg, ncol = 4),
-       dpi = 300, device = "png", height = 12, width = 24,
+       dpi = 300, device = "png", height = 12, width = 24, bg = "white",
        filename = paste0(plot_dir, "Purity_vs_decount_bplot_human_all_FDR=", fdr, "_", date, ".png"))
 
 ggsave(plot_grid(plotlist = pur_bplot_mm, ncol = 4),
-       dpi = 300, device = "png", height = 12, width = 24,
+       dpi = 300, device = "png", height = 12, width = 24, bg = "white",
        filename = paste0(plot_dir, "Purity_vs_decount_bplot_mouse_all_FDR=", fdr, "_", date, ".png"))
 
 ggsave(plot_grid(plotlist = c(min_hg_plot, min_mm_plot), ncol = 2),
-       dpi = 300, device = "png", height = 20, width = 18,
+       dpi = 300, device = "png", height = 20, width = 18, bg = "white",
        filename = paste0(plot_dir, "Purity_vs_decount_bplot_mincount_FDR=", fdr, "_", date, ".png"))
 
 
