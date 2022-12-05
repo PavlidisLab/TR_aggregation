@@ -5,16 +5,19 @@
 library(tidyverse)
 library(WGCNA)
 library(ggrepel)
-source("~/regnetR/R/utils/plot_functions.R")
+source("R/setup-01_config.R")
+source("R/utils/plot_functions.R")
+
 
 topn <- 500  # number of top genes to consider
-fdr <- 0.1
-plot_dir <- "~/Plots/Intersect/"
-date <- "Apr2022"  # most recent data freeze
+plot_dir <- paste0(iplot_dir, "Gene_rankings/")
 
 # List of all TR rankings and data matrices
-rank_list <- readRDS(paste0("~/scratch/R_objects/", date, "_ranked_target_list.RDS"))
-dat_list <- readRDS(paste0("~/scratch/R_objects/", date, "_all_data_list.RDS"))
+rank_list <- readRDS(paste0(scratch_dir, date, "_ranked_target_list.RDS"))
+dat_list <- readRDS(paste0(scratch_dir, date, "_all_data_list.RDS"))
+
+# Curated targets
+lt_all <- read.delim(paste0(meta_dir, "Curated_targets_all_July2022.tsv"), stringsAsFactors = FALSE)
 
 pc_ortho <- read.delim("~/Data/Metadata/hg_mm_1to1_ortho_genes_DIOPT-v8.tsv", stringsAsFactors = FALSE)
 tfs_hg <- names(rank_list$Human)
@@ -43,18 +46,18 @@ cor_list <- list(
 # ------------------------------------------------------------------------------
 
 
-top_ortho <- lapply(tfs_mm, function(x) {
+top_ortho <- lapply(tfs_hg, function(x) {
   
   # Pulling species rank from top ortho rank. Note that some genes may be 
   # filtered from individual sets (eg, no binding) so must get consensus
   
   ortho_symbol <- filter(pc_ortho, ID %in% rank_list$Ortho[[x]]$Symbol[1:topn])
   
-  human_rank <- rank_list$Human[[str_to_upper(x)]] %>% 
+  human_rank <- rank_list$Human[[x]] %>% 
     filter(Symbol %in% ortho_symbol$Symbol_hg) %>% 
     arrange(match(Symbol, ortho_symbol$Symbol_hg))
   
-  mouse_rank <- rank_list$Mouse[[x]] %>% 
+  mouse_rank <- rank_list$Mouse[[str_to_title(x)]] %>% 
     filter(Symbol %in% ortho_symbol$Symbol_mm) %>% 
     arrange(match(Symbol, ortho_symbol$Symbol_mm))
   
@@ -65,10 +68,10 @@ top_ortho <- lapply(tfs_mm, function(x) {
     filter(Mouse < topn & Human < topn)
   
 })
-names(top_ortho) <- tfs_mm
+names(top_ortho) <- tfs_hg
 
 
-# Hes1 and Mecp2 share 34 ortho genes in top 500, Runx1 shares 104
+# Hes1 shares 33 ortho genes in top 500, Runx1 shares 110
 n_top_ortho <- unlist(lapply(top_ortho, nrow))
 summary(n_top_ortho)
 
@@ -77,21 +80,21 @@ summary(n_top_ortho)
 # ------------------------------------------------------------------------------
 
 
-tf <- "Neurod1"
-cmeta <- filter(dat_list$Binding$Meta, str_to_title(Symbol) == tf)
-pmeta <- filter(dat_list$Perturbation$Meta, str_to_title(Symbol) == tf)
+tf <- "NEUROD1"
+cmeta <- filter(dat_list$Binding$Meta, str_to_upper(Symbol) == tf)
+pmeta <- filter(dat_list$Perturbation$Meta, str_to_upper(Symbol) == tf)
 
 # Subset to genes that are topn ranked in both data types
-top_mm <- filter(rank_list$Mouse[[tf]], Rank_binding <= topn & Rank_perturbation <= topn)
+top_mm <- filter(rank_list$Mouse[[str_to_title(tf)]], Rank_binding <= topn & Rank_perturbation <= topn)
 top_hg <- filter(rank_list$Human[[str_to_upper(tf)]], Rank_binding <= topn & Rank_perturbation <= topn)
-top_ortho_all <- filter(rank_list$Ortho[[str_to_title(tf)]], Rank_binding <= topn & Rank_perturbation <= topn)
+top_ortho_all <- filter(rank_list$Ortho[[str_to_upper(tf)]], Rank_binding <= topn & Rank_perturbation <= topn)
 
 # view(top_mm)
 # view(top_hg)
 # view(top_ortho[[tf]])
 # view(rank_list$Mouse[[tf]])
 # view(rank_list$Human[[str_to_upper(tf)]])
-# view(rank_list$Ortho[[str_to_title(tf)]])
+# view(rank_list$Ortho[[str_to_upper(tf)]])
 
 
 # Used for subsetting and plotting a specific gene
@@ -109,18 +112,20 @@ top_ortho_all <- filter(rank_list$Ortho[[str_to_title(tf)]], Rank_binding <= top
 
 
 
+# Return a list of 2 dfs for chip and perturb data for requested gene
+
 gene_list <- function(tf, gene, fdr = 0.1) {
   
-  # Return a list of 2 dfs for chip and perturb data for requested gene
-  
   pmeta <- dat_list$Perturbation$Meta %>% 
-    filter(str_to_lower(Symbol) == str_to_lower(tf))
+    filter(str_to_lower(Symbol) == str_to_lower(tf)) %>% 
+    dplyr::select(Experiment_ID, Cell_Type, Species)
   
   phg <- intersect(colnames(dat_list$Perturbation$Human$FC_mat), pmeta$Experiment_ID)
   pmm <- intersect(colnames(dat_list$Perturbation$Mouse$FC_mat), pmeta$Experiment_ID)
   
   bmeta <- dat_list$Binding$Meta %>% 
-    filter(str_to_lower(Symbol) == str_to_lower(tf))
+    filter(str_to_lower(Symbol) == str_to_lower(tf)) %>% 
+    dplyr::select(Experiment_ID, Cell_Type, Species)
   
   bhg <- intersect(colnames(dat_list$Binding$Human$QN_log), bmeta$Experiment_ID)
   bmm <- intersect(colnames(dat_list$Binding$Mouse$QN_log), bmeta$Experiment_ID)
@@ -243,7 +248,7 @@ plot_scatter <- function(df, tf) {
     if (!df$Curated_target[x]) {
       return("Out")
     } else if (df$Curated_target[x] & df$Rank_integrated[x] < topn) {
-      return ("Top")
+      return("Top")
     } else {
       return("Low-throughput")
     }
@@ -263,7 +268,7 @@ plot_scatter <- function(df, tf) {
                 alpha = 1, shape = 21, size = 3, col = "black", height = 0.3, width = 0.01) +
     geom_text_repel(data = df[df$Group == "Top", ],
                     aes(x = Mean_bind, y = Count_DE, label = Symbol),
-                    force = 0.5, force_pull = 0.5, size = 5, max.overlaps = 20) +
+                    force = 1, force_pull = 2, size = 5, max.overlaps = 20) +
     xlab("Mean bind score") +
     ylab("Count DE (FDR < 0.1)") +
     ggtitle(tf) +
@@ -296,6 +301,10 @@ plist_mm3 <- lapply(tfs_mm, function(x) plot_scatter(df = rank_list$Mouse[[x]], 
 names(plist_mm3) <- tfs_mm
 
 
+plist_ortho3 <- lapply(tfs_hg, function(x) plot_scatter(df = rank_list$Ortho[[x]], tf = x))
+names(plist_ortho3) <- tfs_hg
+
+
 for (tf in tfs_hg) {
   ggsave(plist_hg3[[tf]],
          dpi = 300, device = "png", height = 8, width = 12,
@@ -317,10 +326,21 @@ for (tf in tfs_mm) {
          filename = paste0(plot_dir, "Mouse_", tf, "_targets.png"))
 }
 
-# Pax6 no legend for figure
-ggsave(plist_mm3$Pax6 + theme(legend.position = "none"),
-       dpi = 300, device = "png", height = 8, width = 8,
-       filename = paste0(plot_dir, "Mouse_Pax6_targets_noleg.png"))
+
+for (tf in tfs_hg) {
+  ggsave(plist_ortho3[[tf]],
+         dpi = 300, device = "png", height = 8, width = 12,
+         filename = paste0(plot_dir, "Ortho_", tf, "_targets.png"))
+}
+
+
+
+for (tf in tfs_hg) {
+  ggsave(plot_grid(plist_hg3[[str_to_upper(tf)]] + theme(legend.position = "none"), 
+                   plist_mm3[[str_to_title(tf)]] + theme(legend.position = "none")),
+         dpi = 300, device = "png", height = 8, width = 14,
+         filename = paste0(plot_dir, "Combined_", tf, "_targets.png"))
+}
 
 
 
