@@ -3,6 +3,7 @@
 
 library(tidyverse)
 library(GenomicRanges)
+library(cowplot)
 source("R/setup-01_config.R")
 source("R/utils/range_table_functions.R")
 
@@ -181,10 +182,11 @@ zero_by_tf_hg <- data.frame(peak_prop_hg) %>%
   group_by(Symbol) %>%
   summarize(Mean_0 = mean(Count_0_overlapped))
 
-summary(peak_prop_hg[filter(meta_hg, Symbol != "MECP2")$Experiment_ID, "Count_0_overlapped"])
-summary(peak_prop_hg[filter(meta_hg, Symbol == "MECP2")$Experiment_ID, "Count_0_overlapped"])
+
 summary(peak_prop_hg[, "Count_0_overlapped"])
 summary(peak_prop_nors_hg[, "Count_0_overlapped"])
+summary(peak_prop_hg[filter(meta_hg, Symbol != "MECP2")$Experiment_ID, ])
+summary(peak_prop_hg[filter(meta_hg, Symbol == "MECP2")$Experiment_ID, ])
 
 
 # Mouse: GSE139509_Mecp2_Mouse_Ab1-Mecp2-KO_HISTONE has no cCRE overlap - note
@@ -208,10 +210,10 @@ zero_by_tf_mm <- data.frame(peak_prop_mm) %>%
   group_by(Symbol) %>%
   summarize(Mean_0 = mean(Count_0_overlapped))
 
-summary(peak_prop_mm[filter(meta_mm, Symbol != "Mecp2")$Experiment_ID, "Count_0_overlapped"])
-summary(peak_prop_mm[filter(meta_mm, Symbol == "Mecp2")$Experiment_ID, "Count_0_overlapped"])
 summary(peak_prop_mm[, "Count_0_overlapped"])
 summary(peak_prop_nors_mm[, "Count_0_overlapped"])
+summary(peak_prop_mm[filter(meta_mm, Symbol != "Mecp2")$Experiment_ID, ])
+summary(peak_prop_mm[filter(meta_mm, Symbol == "Mecp2")$Experiment_ID, ])
 
 
 # Find out how many data sets for each TR overlap each cCRE
@@ -253,13 +255,6 @@ ccre_by_tf_mm <- count_ccre_with_tf(ccre_mm, gr_mm, meta_mm, cores)
 
 
 # For each experiment, get the breakdown of peak overlap over each cCRE group.
-
-# Note: The denominator of the proportion calculation is done by total peaks for
-# the given experiment, not how many total cCREs were overlapped. These will
-# be slightly different as resized experiments may still have a small minority
-# of peaks that are assigned to 2 cCREs due bordering each.
-
-
 # ------------------------------------------------------------------------------
 
 
@@ -302,6 +297,59 @@ group_by_tf_hg <- data.frame(group_prop_hg) %>%
   left_join(meta[, c("Experiment_ID", "Symbol")], by = "Experiment_ID") %>% 
   group_by(Symbol) %>% 
   summarise(across(where(is.double), list(mean)))
+
+
+# Using the ENCODE experiments targeting RUNX1 (but diff antibodies and seq
+# tech) to compare group breakdown - find quite similar
+group_prop_hg[c("GSE91747_RUNX1_Human_K562-ENCODE-Ab1", "GSE96253_RUNX1_Human_K562-ENCODE-Ab2"), ]
+
+# Using RUNX1 Kasumi-1 (most represented cell type) to show cCRE group spread
+summary(group_prop_hg[filter(meta, Symbol == "RUNX1")$Experiment_ID, ])
+group_prop_hg[filter(meta, Symbol == "RUNX1")$Experiment_ID, ]
+
+kasumi <- filter(meta, Symbol == "RUNX1" & Cell_Type == "Kasumi-1")$Experiment_ID
+non_kasumi <- filter(meta, Symbol == "RUNX1" & Cell_Type != "Kasumi-1")$Experiment_ID
+
+
+pxa <- 
+  data.frame(group_prop_hg[kasumi, ]) %>% 
+  rownames_to_column(var = "Experiment_ID") %>% 
+  reshape::melt(id = "Experiment_ID") %>% 
+  ggplot(., aes(x = variable, y = value)) +
+  geom_boxplot() +
+  ylab("Proportion of overlap") +
+  ggtitle("RUNX1 Kasumi-1 experiments") +
+  ylim(c(0, 0.6)) +
+  theme_classic() +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 20),
+        axis.text = element_text(size = 20),
+        axis.text.x = element_text(size = 15, angle = 90, vjust = 0.5, hjust = 1))
+
+pxb <- 
+  data.frame(group_prop_hg[non_kasumi, ]) %>% 
+  rownames_to_column(var = "Experiment_ID") %>% 
+  reshape::melt(id = "Experiment_ID") %>% 
+  ggplot(., aes(x = variable, y = value)) +
+  geom_boxplot() +
+  ylab("Proportion of overlap") +
+  ggtitle("RUNX1 non-Kasumi-1 experiments") +
+  ylim(c(0, 0.6)) +
+  theme_classic() +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 20),
+        axis.text = element_text(size = 20),
+        axis.text.x = element_text(size = 15, angle = 90, vjust = 0.5, hjust = 1))
+
+
+plot_grid(pxa, pxb)
+
+
+summary(group_prop_hg[filter(meta, Symbol == "RUNX1" & Cell_Type != "Kasumi-1")$Experiment_ID, ])
+boxplot(group_prop_hg[filter(meta, Symbol == "RUNX1" & Cell_Type != "Kasumi-1")$Experiment_ID, ])
+
+summary(group_prop_hg[filter(meta, Symbol == "RUNX1" & Cell_Type == "Kasumi-1")$Experiment_ID, ])
+boxplot(group_prop_hg[filter(meta, Symbol == "RUNX1" & Cell_Type == "Kasumi-1")$Experiment_ID, ])
 
 
 # Mouse:
@@ -432,9 +480,9 @@ names(all_cols) <- levels(all_ccre)
 
 # Colours for binned group (+mixed for regions bordering 2 groups)
 bin_cols <- list(None = '#d9d9d9',
-                 `Promoter-like` = '#6a3d9a',
+                 `Promoter-like` = '#33a02c',
                  `Enhancer-like` = '#1f78b4',
-                 Other = '#33a02c', 
+                 Other = '#6a3d9a', 
                  Mixed = '#fdbf6f')
 
 
