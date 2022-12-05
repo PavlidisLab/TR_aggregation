@@ -118,7 +118,7 @@ tf_summ <- lapply(tf_summ, function(tf) lapply(tf, `[`, focus_cols))
 tf_list <- lapply(df_list, split_pair_df)
 
 # Example of genes found in the top mouse Mef2c overlap
-exp <- tf_list$Mouse$Mef2c %>% slice_max(Pval_Intersect)
+exp <- tf_list$Mouse$MEF2C %>% slice_max(Pval_Intersect)
 exp <- paste(exp$Row, exp$Col, sep = ":")
 top_genes <- sim_list$Mouse$Pval_Genes[exp]
 
@@ -182,7 +182,7 @@ count_ortho <- overlap_counts(
 
 top_ascl1 <- data.frame(count_hg) %>% 
   rownames_to_column(var = "Target") %>% 
-  arrange(desc(Ascl1))
+  arrange(desc(ASCL1))
 
 
 # Plot
@@ -206,15 +206,15 @@ p3c <- stat_vboxplot(df_list$Ortho, y_var = "Downreg_Intersect", y_name = paste0
 
 
 ggsave(plot_grid(p1a, p1b, p1c, nrow = 1),
-       dpi = 300, device = "png", height = 8, width = 16,
+       dpi = 300, device = "png", height = 8, width = 16, bg = "white",
        filename = paste0(plot_dir, "Vbplot_all_human_", date, ".png"))
 
 ggsave(plot_grid(p2a, p2b, p2c, nrow = 1),
-       dpi = 300, device = "png", height = 8, width = 16,
+       dpi = 300, device = "png", height = 8, width = 16, bg = "white",
        filename = paste0(plot_dir, "Vbplot_all_mouse_", date, ".png"))
 
 ggsave(plot_grid(p3a, p3b, p3c, nrow = 1),
-       dpi = 300, device = "png", height = 8, width = 20,
+       dpi = 300, device = "png", height = 8, width = 20, bg = "white",
        filename = paste0(plot_dir, "Vbplot_all_ortho_", date, ".png"))
 
 
@@ -259,49 +259,50 @@ ggsave(p5c, dpi = 300, device = "png", height = 6, width = 9,
 # Heatmap
 
 
-anno_colour = list(Symbol = tf_pal)
+# anno_colour = list(Symbol = tf_pal_hg)
 # Species = c(Human = "royalblue", Mouse = "goldenrod")  # pretty cramped using TF and species colours
 
 pal_length <- 11
 heatmap_pal <- viridis::magma(pal_length)
 
 
-plot_heatmap <- function(plot_mat, 
-                         chip_meta, 
+plot_heatmap <- function(plot_mat,
+                         chip_meta,
                          perturb_meta,
                          pal_length = 11,
+                         anno_colour,
                          file) {
-  
+
   color_min <- min(plot_mat, na.rm = TRUE)
   color_max <- max(plot_mat, na.rm = TRUE)
   color_breaks <- seq(color_min, color_max, length.out = pal_length)
-  
+
   # annotations for heatmap
-  row_meta <- chip_meta %>% 
-    distinct(Experiment_ID, .keep_all = TRUE) %>% 
-    filter(Experiment_ID %in% rownames(plot_mat)) %>% 
-    mutate(Symbol = str_to_title(Symbol)) %>% 
+  row_meta <- chip_meta %>%
+    distinct(Experiment_ID, .keep_all = TRUE) %>%
+    filter(Experiment_ID %in% rownames(plot_mat)) %>%
+    mutate(Symbol = str_to_upper(Symbol)) %>%
     # select(Symbol, Species)
     select(Symbol)
   rownames(row_meta) <- rownames(plot_mat)
-  
-  col_meta <- perturb_meta %>% 
-    filter(Experiment_ID %in% colnames(plot_mat)) %>% 
-    mutate(Symbol = str_to_title(Symbol)) %>% 
+
+  col_meta <- perturb_meta %>%
+    filter(Experiment_ID %in% colnames(plot_mat)) %>%
+    mutate(Symbol = str_to_upper(Symbol)) %>%
     select(Symbol)
   # select(Symbol, Species)
-  rownames(col_meta) <- colnames(plot_mat)  
-  
+  rownames(col_meta) <- colnames(plot_mat)
+
   # tf row/col breaks
   row_breaks <- sapply(unique(row_meta$Symbol), function(x) {
     tail(which(row_meta$Symbol == x), n = 1)
   })
-  
+
   col_breaks <- sapply(unique(col_meta$Symbol), function(x) {
     tail(which(col_meta$Symbol == x), n = 1)
   })
-  
-  
+
+
   pheatmap(
     plot_mat,
     cluster_rows = FALSE,
@@ -318,18 +319,27 @@ plot_heatmap <- function(plot_mat,
     annotation_colors = anno_colour,
     gaps_row = row_breaks,
     gaps_col = col_breaks,
-    height = 4,
-    width = 6,
+    height = 8,
+    width = 10,
     filename = file)
-  
+
 }
 
 
-plot_heatmap(plot_mat = sim_list$Human$Pval_Intersect, chip_meta = dat$Binding$Meta, perturb_meta = dat$Perturbation$Meta,
+plot_heatmap(plot_mat = sim_list$Human$Pval_Intersect, 
+             chip_meta = dat$Binding$Meta, 
+             perturb_meta = dat$Perturbation$Meta,
+             anno_colour = list(Symbol = tf_pal_hg),
              file = paste0(plot_dir, "Human_Intersect_heatmap_", date, "_chip=QNlog_perturb=pval_top=", topn, "common_only=", common_arg, ".png"))
 
-plot_heatmap(plot_mat = sim_list$Mouse$Pval_Intersect, chip_meta = dat$Binding$Meta, perturb_meta = dat$Perturbation$Meta,
+plot_heatmap(plot_mat = sim_list$Mouse$Pval_Intersect, 
+             chip_meta = dat$Binding$Meta, 
+             perturb_meta = dat$Perturbation$Meta,
+             anno_colour = list(Symbol = tf_pal_hg),
              file = paste0(plot_dir, "Mouse_Intersect_heatmap_", date, "_chip=QNlog_perturb=pval_top=", topn, "common_only=", common_arg, ".png"))
 
-plot_heatmap(plot_mat = sim_list$Ortho$Pval_Intersect, chip_meta = dat$Binding$Meta, perturb_meta = dat$Perturbation$Meta,
+plot_heatmap(plot_mat = sim_list$Ortho$Pval_Intersect, 
+             chip_meta = dat$Binding$Meta, 
+             perturb_meta = dat$Perturbation$Meta,
+             anno_colour = list(Symbol = tf_pal_hg),
              file = paste0(plot_dir, "Ortho_Intersect_heatmap_", date, "_chip=QNlog_perturb=pval_top=", topn, "common_only=", common_arg, ".png"))
