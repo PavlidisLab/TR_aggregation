@@ -286,8 +286,11 @@ ggsave(p3c, height = 9, width = 14, dpi = 300, device = "png",
 
 # heatmaps to show gene coverage across experiments
 
-anno_col <- list(Symbol = tf_pal,
-                 Platform_type = c(Array = "lightgrey", Sequencing = "grey30"))
+anno_col_hg <- list(Symbol = tf_pal_hg,
+                    Platform_type = c(Array = "lightgrey", Sequencing = "grey30"))
+
+anno_col_mm <- list(Symbol = tf_pal_mm,
+                    Platform_type = c(Array = "lightgrey", Sequencing = "grey30"))
 
 
 # mouse binary (gene present or not)
@@ -316,7 +319,7 @@ pheatmap(
   show_colnames = FALSE,
   annotation_row = meta_anno_mm,
   annotation_names_row = FALSE,
-  annotation_colors = anno_col,
+  annotation_colors = anno_col_mm,
   legend = FALSE,
   height = 6,
   width = 10,
@@ -334,8 +337,7 @@ mat_hg_binary[is.na(mat_hg_binary)] <- 0
   
 meta_anno_hg <- meta %>%
   filter(Species == "Human") %>%
-  select(Symbol, Platform_type) %>%
-  mutate(Symbol = str_to_title(Symbol))
+  select(Symbol, Platform_type)
 
 rownames(meta_anno_hg) <- colnames(mat_hg_binary)
   
@@ -350,7 +352,7 @@ pheatmap(
   show_colnames = FALSE,
   annotation_row = meta_anno_hg,
   annotation_names_row = FALSE,
-  annotation_colors = anno_col,
+  annotation_colors = anno_col_hg,
   legend = FALSE,
   height = 6,
   width = 10,
@@ -368,7 +370,7 @@ mat_ortho_binary[is.na(mat_ortho_binary)] <- 0
   
 meta_anno_all <- meta %>%
   select(Symbol, Platform_type) %>%
-  mutate(Symbol = str_to_title(Symbol))
+  mutate(Symbol = str_to_upper(Symbol))
   
 rownames(meta_anno_all) <- colnames(mat_ortho_binary)
   
@@ -381,7 +383,7 @@ pheatmap(
   show_colnames = FALSE,
   annotation_row = meta_anno_all,
   annotation_names_row = FALSE,
-  annotation_colors = anno_col,
+  annotation_colors = anno_col_hg,
   legend = FALSE,
   height = 7,
   width = 10,
