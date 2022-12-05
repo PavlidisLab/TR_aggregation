@@ -149,11 +149,12 @@ write.table(
 # ------------------------------------------------------------------------------
 
 
+# Returns a 1x5 df that summarizes the probe values for perturbed TFs that are
+# not in the expected direction of change. This is fed into an lapply call and 
+# assumes that meta_df is a 1 row slice that corresponds to the supplied 
+# resultset table
+
 summarize_multi_probes <- function(meta_df, resultset) {
-  # Helper that returns a 1x5 df that summarizes the probe values for perturbed
-  # TFs that are not in the expected direction of change. This is fed into
-  # an lapply call and assumes that meta_df is a 1 row slice that corresponds
-  # to the supplied resultset table
   
   perturb <- meta_df$Perturbation
   mean_fc <- mean(resultset$FoldChange)
@@ -195,7 +196,7 @@ multi_unexpected <- lapply(which_multi_unexpected, function(x) {
 multi_unexpected_df <- do.call(rbind, multi_unexpected)
 
 
-# look at the percentile rank fold change of the pertured TF - if unexpected
+# look at the percentile rank fold change of the perturbed TF - if unexpected
 # in direction, is it still highly ranked?
 
 summary(unexpected_df$PercRankFC)  # median 0.81
@@ -209,15 +210,15 @@ pert_df[which(pert_df$PercRankFC < 0.8 & abs(pert_df$FoldChange) >= 1), ]
 # ------------------------------------------------------------------------------
 
 
-write_sheet(data = filter(unexpected_df, !Experiment_ID %in% multi_unexpected_df$Experiment_ID),
-            ss = gsheets_perturb,
-            sheet = paste0("Unexpected_single_probe_", date)
-)
-
-write_sheet(data = multi_unexpected_df,
-            ss = gsheets_perturb,
-            sheet = paste0("Unexpected_multi_probe_", date)
-)
+# write_sheet(data = filter(unexpected_df, !Experiment_ID %in% multi_unexpected_df$Experiment_ID),
+#             ss = gsheets_perturb,
+#             sheet = paste0("Unexpected_single_probe_", date)
+# )
+# 
+# write_sheet(data = multi_unexpected_df,
+#             ss = gsheets_perturb,
+#             sheet = paste0("Unexpected_multi_probe_", date)
+# )
 
 
 # Summary of fold changes across experiments
@@ -229,7 +230,7 @@ fc_df <- lapply(1:length(results), function(x) {
   data.frame(
     FoldChange = results[[x]][, "FoldChange"],
     Experiment_ID = meta$Experiment_ID[x],
-    Symbol = str_to_title(meta$Symbol[x])
+    Symbol = str_to_upper(meta$Symbol[x])
   )
 })
 
@@ -246,7 +247,6 @@ cor.test(pert_df_nona$PercRankFC, pert_df_nona$Count_DEG, method = "spearman")
 
 # fold change +/- abs
 cor.test(pert_df_nona$FoldChange, pert_df_nona$Count_DEG, method = "spearman")
-
 cor.test(abs(pert_df_nona$FoldChange), pert_df_nona$Count_DEG)
 
 # require count DEG > 0
@@ -284,7 +284,7 @@ cor.test(
 
 # remove NAs and collapse mouse and human symbols
 
-plot_df <- pert_df %>% mutate(Symbol = str_to_title(Symbol))
+plot_df <- pert_df %>% mutate(Symbol = str_to_upper(Symbol))
 
 plot_df_nona <- plot_df %>% filter(!is.na(FoldChange))
 
@@ -307,14 +307,14 @@ p1 <-
         axis.text.y = element_text(size = 25),
         axis.title = element_text(size = 25),
         strip.text.x = element_text(size = 20),
-        strip.background=element_rect(colour = "black", fill= "azure3"),
+        strip.background = element_rect(colour = "black", fill = "azure3"),
         panel.grid = element_blank(),  # to work with expand in scale x
-        legend.text=element_text(size = 25),
-        legend.title=element_blank()) +
-  scale_fill_manual(values = tf_pal)
+        legend.text = element_text(size = 25),
+        legend.title = element_blank()) +
+  scale_fill_manual(values = tf_pal_hg)
 
 
-ggsave(p1, height = 8, width = 12, dpi = 300, device = "png",
+ggsave(p1, height = 8, width = 13, dpi = 300, device = "png",
        filename = paste0(plot_dir, "Perturbed_TF_FC_", date, ".png"))
 
 
@@ -334,11 +334,11 @@ p2 <-
         axis.text.y = element_text(size = 25),
         axis.title = element_text(size = 25),
         strip.text.x = element_text(size = 20),
-        strip.background=element_rect(colour = "black", fill= "azure3"),
+        strip.background = element_rect(colour = "black", fill = "azure3"),
         panel.grid = element_blank(),  # to work with expand in scale x
-        legend.text=element_text(size = 25),
-        legend.title=element_blank()) +
-  scale_fill_manual(values = tf_pal)
+        legend.text = element_text(size = 25),
+        legend.title = element_blank()) +
+  scale_fill_manual(values = tf_pal_hg)
 
 
 ggsave(p2, height = 8, width = 12, dpi = 300, device = "png",
@@ -349,7 +349,7 @@ ggsave(p2, height = 8, width = 12, dpi = 300, device = "png",
 
 # col by TF
 p3a <- 
-  ggplot(plot_df, aes(x = Experiment_ID, y = log10(Count_DEG+1), fill = Symbol)) +
+  ggplot(plot_df, aes(x = Experiment_ID, y = log10(Count_DEG + 1), fill = Symbol)) +
   geom_point(size = 4.6, color = "black", shape = 21) +
   facet_grid(. ~ Symbol) +
   scale_x_discrete(expand = c(0.2, 0.2)) +  # points were getting cut off
@@ -360,15 +360,15 @@ p3a <-
         axis.text.y = element_text(size = 25),
         axis.ticks.x = element_blank(),
         axis.title = element_text(size = 25),
-        strip.text = element_text(size = 20),
+        strip.text = element_text(size = 18),
         strip.background = element_rect(colour = "black", fill = "cornsilk2"),
         panel.grid = element_blank(), # to work with expand in scale x
         legend.position = "none") +
-  scale_fill_manual(values = tf_pal)
+  scale_fill_manual(values = tf_pal_hg)
 
 # col by perturb
 p3b <- 
-  ggplot(plot_df, aes(x = Experiment_ID, y = log10(Count_DEG+1), fill = Perturbation)) +
+  ggplot(plot_df, aes(x = Experiment_ID, y = log10(Count_DEG + 1), fill = Perturbation)) +
   geom_point(size = 5.5, color = "black", shape = 21) +
   facet_grid(. ~ Symbol) +
   scale_x_discrete(expand = c(0.2, 0.2)) +  # points were getting cut off
@@ -379,16 +379,16 @@ p3b <-
         axis.text.y = element_text(size = 25),
         axis.ticks.x = element_blank(),
         axis.title = element_text(size = 25),
-        strip.text = element_text(size = 20),
+        strip.text = element_text(size = 18),
         strip.background = element_rect(colour = "black", fill = "cornsilk2"),
         panel.grid = element_blank(), # to work with expand in scale x
-        legend.text=element_text(size = 25),
-        legend.title=element_blank()) +
+        legend.text = element_text(size = 25),
+        legend.title = element_blank()) +
   scale_fill_manual(values = pert_anno$Perturbation)
 
-# col by perturb and shape by species
+# col by perturb and shape by species (used in paper)
 p3c <- 
-  ggplot(plot_df, aes(x = Experiment_ID, y = log10(Count_DEG+1), fill = Perturbation, shape = Species)) +
+  ggplot(plot_df, aes(x = Experiment_ID, y = log10(Count_DEG + 1), fill = Perturbation, shape = Species)) +
   geom_point(size = 5.5, color = "black") +
   facet_grid(. ~ Symbol) +
   scale_x_discrete(expand = c(0.2, 0.2)) +  # points were getting cut off
@@ -399,11 +399,11 @@ p3c <-
         axis.text.y = element_text(size = 25),
         axis.ticks.x = element_blank(),
         axis.title = element_text(size = 25),
-        strip.text = element_text(size = 20),
+        strip.text = element_text(size = 18),
         strip.background = element_rect(colour = "black", fill = "cornsilk2"),
         panel.grid = element_blank(),  # to work with expand in scale x
-        legend.text=element_text(size = 25),
-        legend.title=element_blank()) +
+        legend.text = element_text(size = 25),
+        legend.title = element_blank()) +
   scale_fill_manual(values = pert_anno$Perturbation) +
   scale_shape_manual(values = species_shape) +
   guides(fill = guide_legend(override.aes = list(shape = 21)),
@@ -428,9 +428,9 @@ ggsave(p3c_noleg, height = 6, width = 12, dpi = 300, device = "png",
 # Scatter plot of the relationships between perturb effect size and count DEGs
 
 
-# PRFC
+# PRFC (used in paper)
 p4 <- 
-  ggplot(plot_df_nona, aes(x = PercRankFC, y = log10(Count_DEG+1), fill = Symbol)) +
+  ggplot(plot_df_nona, aes(x = PercRankFC, y = log10(Count_DEG + 1), fill = Symbol)) +
   geom_jitter(size = 5, color = "black", shape = 21) +
   ylab(paste0("log10 Count of DEGs at FDR", fdr)) +
   xlab("Percentile rank fold change of perturbed TR") +
@@ -439,14 +439,14 @@ p4 <-
         axis.title = element_text(size = 25),
         legend.text = element_text(size = 25),
         legend.title = element_blank()) +
-  scale_fill_manual(values = tf_pal)
+  scale_fill_manual(values = tf_pal_hg)
 
 ggsave(p4, height = 9, width = 12, dpi = 300, device = "png",
        filename = paste0(plot_dir, "DEG_counts_vs_PercRankFC_", date, ".png"))
 
 # fold change +/- abs
 p5a <- 
-  ggplot(plot_df_nona, aes(x = FoldChange, y = log10(Count_DEG+1), fill = Symbol)) +
+  ggplot(plot_df_nona, aes(x = FoldChange, y = log10(Count_DEG + 1), fill = Symbol)) +
   geom_jitter(size = 5, color = "black", shape = 21) +
   ylab(paste0("log10 Count of DEGs at FDR", fdr)) +
   xlab("Log2 fold change of perturbed TR") +
@@ -455,10 +455,10 @@ p5a <-
         axis.title = element_text(size = 25),
         legend.text = element_text(size = 25),
         legend.title = element_blank()) +
-  scale_fill_manual(values = tf_pal)
+  scale_fill_manual(values = tf_pal_hg)
 
 p5b <- 
-  ggplot(plot_df_nona, aes(x = abs(FoldChange), y = log10(Count_DEG+1), fill = Symbol)) +
+  ggplot(plot_df_nona, aes(x = abs(FoldChange), y = log10(Count_DEG + 1), fill = Symbol)) +
   geom_jitter(size = 5, color = "black", shape = 21) +
   ylab(paste0("log10 Count of DEGs at FDR", fdr)) +
   xlab("Absolute log2 fold change of perturbed TR") +
@@ -467,7 +467,7 @@ p5b <-
         axis.title = element_text(size = 25),
         legend.text = element_text(size = 25),
         legend.title = element_blank()) +
-  scale_fill_manual(values = tf_pal)
+  scale_fill_manual(values = tf_pal_hg)
 
 ggsave(p5a, height = 9, width = 12, dpi = 300, device = "png",
        filename = paste0(plot_dir, "DEG_counts_vs_FC_", date, ".png"))
@@ -502,12 +502,12 @@ p6a <-
         axis.text.y = element_text(size = 25),
         legend.text = element_text(size = 25),
         legend.title = element_blank()) +
-  scale_fill_manual(values = tf_pal)
+  scale_fill_manual(values = tf_pal_hg)
 
 p6b <- p6a + theme(legend.position = "none")
 
 
-ggsave(p6a, height = 6, width = 14, dpi = 300, device = "png",
+ggsave(p6a, height = 6, width = 15, dpi = 300, device = "png",
        filename = paste0(plot_dir, "DEG_counts_boxplot_", date, ".png"))
 
 ggsave(p6b, height = 6, width = 12, dpi = 300, device = "png",
@@ -517,27 +517,27 @@ ggsave(p6b, height = 6, width = 12, dpi = 300, device = "png",
 # boxplot of DEs by perturbation type
 
 p7a <- pert_df %>% 
-  ggplot(., aes(x = Perturbation, y = log10(Count_DEG+1))) +
+  ggplot(., aes(x = Perturbation, y = log10(Count_DEG + 1))) +
   geom_boxplot(width = 0.4, fill = "turquoise4") +
   ylab(paste0("log10 Count of DEGs at FDR", fdr)) +
   # ggtitle("All experiments") +
   theme_classic() +
     theme(axis.title.x = element_blank(),
           axis.title = element_text(size = 25),
-          axis.text = element_text(size = 25),
+          axis.text = element_text(size = 20),
           plot.title = element_text(hjust = 0.5, size = 20))
-      
+
 
 p7b <- pert_df %>% 
   filter(Count_DEG > 0) %>% 
-  ggplot(., aes(x = Perturbation, y = log10(Count_DEG+1))) +
+  ggplot(., aes(x = Perturbation, y = log10(Count_DEG + 1))) +
   geom_boxplot(width = 0.4, fill = "turquoise4") +
   ylab(paste0("log10 Count of DEGs at FDR", fdr)) +
   # ggtitle("Excluding experiments with 0 DEGs") +
   theme_classic() +
   theme(axis.title.x = element_blank(),
         axis.title = element_text(size = 25),
-        axis.text = element_text(size = 25),
+        axis.text = element_text(size = 20),
         plot.title = element_text(hjust = 0.5, size = 20))
 
 
