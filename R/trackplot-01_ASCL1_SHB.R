@@ -106,8 +106,8 @@ id_sample <- rbind(id_sample, tcf4)
 
 # trackplot colours by TR
 
-col_ascl1 <- tf_pal["Ascl1"]
-col_sample <- tf_pal[str_to_title(id_sample$Symbol)]
+col_ascl1 <- tf_pal_hg["ASCL1"]
+col_sample <- tf_pal_hg[str_to_upper(id_sample$Symbol)]
 
 
 # get full paths to big wig files
@@ -142,11 +142,13 @@ track_sample <- track_extract(
 track_max <- median(unlist(lapply(track_ascl1, function(x) max(data.frame(x)$max))))
 
 
-# Plot tracks
+# Plot tracks - note that titles are too small for pub (can't find how to 
+# change), so save with and without titles for manual adding
 
 # ASCL1
+
 png(height = 20, width = 12, units = "in", res = 300,
-    filename = paste0(plot_dir, "Human_ASCL1_", locus, ".png"))
+    filename = paste0(plot_dir, "Human_ASCL1_titles_", locus, ".png"))
 
 track_plot(
   summary_list = track_ascl1,
@@ -161,9 +163,25 @@ track_plot(
 graphics.off()
 
 
-# Sample
 png(height = 20, width = 12, units = "in", res = 300,
-    filename = paste0(plot_dir, "Human_sample-TR_", locus, ".png"))
+    filename = paste0(plot_dir, "Human_ASCL1_notitles_", locus, ".png"))
+
+track_plot(
+  summary_list = track_ascl1,
+  col = col_ascl1,
+  build = "hg38",
+  collapse_txs = FALSE,
+  groupAutoScale = FALSE,  # each track has its own ylim scale
+  track_names = rep("", length(id_ascl1))
+)
+
+graphics.off()
+
+
+# Sample
+
+png(height = 20, width = 12, units = "in", res = 300,
+    filename = paste0(plot_dir, "Human_sample-TR_titles_", locus, ".png"))
 
 track_plot(
   summary_list = track_sample,
@@ -174,4 +192,28 @@ track_plot(
   track_names = id_sample$Experiment_ID,
   track_names_pos = 1
 )
+
 graphics.off()
+
+png(height = 20, width = 12, units = "in", res = 300,
+    filename = paste0(plot_dir, "Human_sample-TR_notitles_", locus, ".png"))
+
+track_plot(
+  summary_list = track_sample,
+  col = col_sample,
+  build = "hg38",
+  collapse_txs = FALSE,
+  y_max = track_max,
+  track_names = rep("", length(id_sample))
+)
+
+graphics.off()
+
+
+write.table(
+  data.frame(ASCL1 = id_ascl1, Sample = id_sample$Experiment_ID),
+  quote = FALSE,
+  row.names = FALSE,
+  sep = "\t",
+  file = paste0(plot_dir, "ASCL1_SHB_trackplot_experimentIDs.tsv")
+)
