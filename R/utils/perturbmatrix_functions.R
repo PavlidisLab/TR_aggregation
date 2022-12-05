@@ -13,17 +13,18 @@ count_table <- function(fdr_mat, fdr) {
   count_de <- rowSums(deg_mat, na.rm = TRUE)
   count_na <- apply(deg_mat, 1, function(x) sum(is.na(x)))
   count_exps <- ncol(deg_mat)
-  frac_measured <- round(count_de / (count_exps - count_na), 3)
-  frac_all <- round(count_de / count_exps, 3)
+  prop_measured <- round(count_de / (count_exps - count_na), 3)
+  prop_all <- round(count_de / count_exps, 3)
   
   df <- data.frame(
     Symbol = names(count_de),
     Count_DE = count_de,
-    Fraction_DE_measured = frac_measured,
-    Fraction_DE_all = frac_all,
+    Proportion_DE_measured = prop_measured,
+    Proportion_DE_all = prop_all,
     Count_NA = count_na,
     stringsAsFactors = FALSE
   )
+  
   return(df[order(df$Count_DE, decreasing = TRUE), ])
 }
 
@@ -69,13 +70,13 @@ is_consistent_across <- function(count_table) {
   gof_class <- ifelse(count_table$GoF_down > count_table$GoF_up, "GoF_down", "GoF_up")
   lof_class <- ifelse(count_table$LoF_down > count_table$LoF_up, "LoF_down", "LoF_up")
   
-  count_table$Consistent_across <- ifelse(
+  consistent <- ifelse(
     (gof_class == "GoF_down" & lof_class == "LoF_down") |
-      (gof_class == "GoF_up" & lof_class == "LoF_up"),
+    (gof_class == "GoF_up" & lof_class == "LoF_up"),
     FALSE,
-    TRUE
-  )
-  return(count_table)
+    TRUE)
+  
+  return(consistent)
 }
 
 
@@ -125,12 +126,12 @@ add_purity <- function(count_table, use_total = "all") {
 
 add_signed_purity <- function(count_table) {
  
-  stopifnot(c("Consistent_across", "Purity") %in% colnames(count_table))
+  stopifnot("Purity" %in% colnames(count_table))
   
-  count_table$Signed_purity <- 
-    ifelse(count_table$Consistent_across, 
-           count_table$Purity, 
-           -(count_table$Purity))
+  consistent_across <- is_consistent_across(count_table)
+  
+  count_table <- count_table %>% 
+    mutate(Signed_purity = ifelse(consistent_across, Purity, -Purity))
   
   return(count_table)
 }
@@ -163,8 +164,7 @@ process_all <- function(fdr_mat,
   
   de_count <- count_table(fdr_mat, fdr)
   
-  direction <- tally_direction(fc_mat, meta) %>% 
-    is_consistent_across()
+  direction <- tally_direction(fc_mat, meta)
   
   fc <- avg_abs_fc(fc_mat)
   
@@ -194,7 +194,7 @@ process_tf <- function(fdr_mat,
                        ortho = FALSE,
                        cores = 8) {
   
-  if (ortho) meta$Symbol <- str_to_title(meta$Symbol)
+  if (ortho) meta$Symbol <- str_to_upper(meta$Symbol)
   
   tfs <- unique(meta$Symbol)
   
@@ -220,12 +220,12 @@ process_tf <- function(fdr_mat,
 
 merge_ortho_counts <- function(count_ortho, count_hg, count_mm, pc_ortho) {
   
-  tfs <- str_to_title(c(names(count_ortho), names(count_hg), names(count_mm)))
+  tfs <- str_to_upper(c(names(count_ortho), names(count_hg), names(count_mm)))
   tfs <- unique(tfs)
   
   tf_list <- lapply(tfs, function(x) {
     
-    mm <- count_mm[[x]][, c("Symbol", "Count_DE")] %>% 
+    mm <- count_mm[[str_to_title(x)]][, c("Symbol", "Count_DE")] %>% 
       filter(Symbol %in% pc_ortho$Symbol_mm) %>% 
       dplyr::rename(Symbol_mm = Symbol, Count_DE_mm = Count_DE) %>% 
       left_join(pc_ortho, by = "Symbol_mm") %>% 
@@ -244,5 +244,6 @@ merge_ortho_counts <- function(count_ortho, count_hg, count_mm, pc_ortho) {
                 by = "Symbol")
   })
   names(tf_list) <- tfs
+  
   return(tf_list)
 }
