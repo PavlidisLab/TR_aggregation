@@ -13,41 +13,96 @@ library(parallel)
 library(pheatmap)
 library(DescTools)
 library(cowplot)
-source("~/regnetR/R/utils/plot_functions.R")
-source("~/regnetR/R/utils/ranking_functions.R")
+source("R/setup-01_config.R")
+source("R/utils/plot_functions.R")
+source("R/utils/ranking_functions.R")
 
-date <- "Apr2022"
-plot_dir <- "~/Plots/Intersect/"
+plot_dir <- paste0(iplot_dir, "Gene_rankings/")
 
 # List of all TR rankings and data matrices
-rank_list <- readRDS(paste0("~/scratch/R_objects/", date, "_ranked_target_list.RDS"))
-dat_list <- readRDS(paste0("~/scratch/R_objects/", date, "_all_data_list.RDS"))
+rank_list <- readRDS(paste0(scratch_dir, date, "_ranked_target_list.RDS"))
+dat_list <- readRDS(paste0(scratch_dir, date, "_all_data_list.RDS"))
 
-# lt_all is all curated targets (includes external dbs aggregated in Chu 2021)
-# while pavlab are only interactions curated by our group
-lt_all <- read.delim("~/Data/Metadata/Curated_targets_all_July2022.tsv", stringsAsFactors = FALSE)
-lt_pavlab <- read.delim("~/Data/Metadata/Curated_targets_pavlab_July2022.tsv", stringsAsFactors = FALSE)
+# Curated targets
+lt_all <- read.delim(paste0(meta_dir, "Curated_targets_all_July2022.tsv"), stringsAsFactors = FALSE)
 
-pc_ortho <- read.delim("~/Data/Metadata/hg_mm_1to1_ortho_genes_DIOPT-v8.tsv", stringsAsFactors = FALSE)
+pc_ortho <- read.delim(paste0(meta_dir, "hg_mm_1to1_ortho_genes_DIOPT-v8.tsv"), stringsAsFactors = FALSE)
 tfs_hg <- names(rank_list$Human)
 tfs_mm <- names(rank_list$Mouse)
 
+ol_list <- readRDS(paste0(scratch_dir, date, "_intersect_similarity.RDS"))
 
 # Describe count of targets and human/mouse presence
+# TODO: human/mouse presence
 # ------------------------------------------------------------------------------
 
 
+lt_sub <- lt_all %>% 
+  mutate(
+    TF_Symbol = str_to_upper(TF_Symbol),
+    Target_Symbol = str_to_upper(Target_Symbol),
+    Experiment_Type = ifelse(is.na(Experiment_Type), "Unknown", Experiment_Type)
+    ) %>% 
+  filter(TF_Symbol %in% names(rank_list$Human)) 
+
+
+# Count by low-throughpuut table
+lt_sub %>% 
+  group_by(TF_Symbol) %>% 
+  summarise(n = n_distinct(Target_Symbol))
+
+
+# Using human rankings to get the number of curated targets
 n_target <- data.frame(
   Symbol = names(rank_list$Human),
   Count = unlist(lapply(rank_list$Human, function(x) sum(x$Curated_target)))
-)
+) %>% 
+  arrange(desc(Count))
 
+# How many unique targets across the TRs
 n_unique <- n_distinct(unlist(
   lapply(rank_list$Human, function(x) filter(x, Curated_target)$Symbol)
 ))
 
 
-# Test gene rankings with/without curated evidence
+# TODO: better spot for this note
+# NOTE: TF-targets can have multiplicity in evidence for the same experiment
+# type, given that they are done in unique cell types. Eg, ASCL1-DLL1 has 7 
+# entries in human: 3x perturbation, 2x binding, 2x reporter assays, and 5
+# in mouse: 2 binding, 2 perturbation, 1 reporter. However, also note that 9/12
+# of these experiments come from the same study. RUNX1-SPI1 21 experiments
+
+
+n_type <- lt_sub %>% 
+  mutate(TF_Symbol = factor(TF_Symbol, levels = unique(n_target$Symbol))) %>% 
+  count(Experiment_Type, TF_Symbol, name = "Count")
+
+
+exp_per_target <- lapply(split(lt_sub, lt_sub$TF_Symbol), function(x) {
+  
+  a <- count(x, Target_Symbol, Experiment_Type)
+  b <- matrix(0, nrow = n_distinct(a$Target_Symbol), ncol = 5)
+  rownames(b) <- unique(a$Target_Symbol)
+  colnames(b) <- c(unique(n_type$Experiment_Type), "Sum")
+  
+  for (i in 1:nrow(a)) {
+    b[a$Target_Symbol[i], a$Experiment_Type[i]] <- a$n[i]
+  }
+  
+  b[, "Sum"] <- rowSums(b)
+  
+  b <- b[order(b[, "Sum"], decreasing = TRUE), ]
+  
+  return(b)
+})
+names(exp_per_target) <- unique(lt_sub$TF_Symbol)
+
+
+
+# Wilcoxon rank sum test for the three gene rankings by presence of curated
+# evidence. # In mouse find evidence for all rankings save for Neurod1 
+# perturbation and Tcf4 binding and integrated. In human it's a bit more spotty 
+# (no MEF2C reaches sig) but the majority of comparisons still provide evidence
 # ------------------------------------------------------------------------------
 
 
@@ -65,9 +120,10 @@ wilx_list <-
 wilx_sig <- lapply(wilx_list, function(x) x < 0.05)
 
 
-# The following generates for each TR a precision recall data frame and the area
-# under the precision recall curve (AUPRC) for the ability of the rankings to
-# recover the curated targets
+# The following generates for each TR and each gene ranking, a precision recall 
+# data frame where each entry has the calculated P+R for the top k ranked genes
+# presence in the curated resource. These are then summarized with the area
+# under the precision recall curve (AUPRC)
 # ------------------------------------------------------------------------------
 
 
@@ -108,7 +164,7 @@ top5 <- function(df, rank) {
 
 top5_all <- function(df) {
   list(
-    Aggregate = top5(df, "Rank_integrated"),
+    Integrated = top5(df, "Rank_integrated"),
     Bind = top5(df, "Rank_binding"),
     Perturb = top5(df, "Rank_perturbation")
   )
@@ -124,7 +180,7 @@ top5_list <- list(
 
 
 # Iteratively sample targets from curated resource and calculate AUPRC using
-# the original ranking (slow!). NOTE: Currently using the default sorting by 
+# a given TR's ranking (slow!). NOTE: Currently using the default sorting by 
 # integrated ranking when calculating AUPRC for each sample
 # ------------------------------------------------------------------------------
 
@@ -144,6 +200,9 @@ prop_list <- list(
   Mouse = get_all_prop(auprc_list$Mouse, sample_target_list$Mouse)
 )
 
+
+sample_target_list$Human$ASCL1 %>% head
+prop_list$Human %>% head
 
 # For each TR, get the AUPRC from the individual data sets composing the 
 # aggregation, as well as individual rank product pairs. Focus on ordering
@@ -176,17 +235,17 @@ names(mm) <- tfs_mm
   
   
 # Note for ortho just coerce casing of symbol to same to grab both
-ortho <- lapply(tfs_mm, function(x) {
+ortho <- lapply(tfs_hg, function(x) {
   all_experiment_auprc(
     tf = x,
-    chip_meta = mutate(dat_list$Binding$Meta, Symbol = str_to_title(Symbol)),
-    perturb_meta = mutate(dat_list$Perturbation$Meta, Symbol = str_to_title(Symbol)),
+    chip_meta = mutate(dat_list$Binding$Meta, Symbol = str_to_upper(Symbol)),
+    perturb_meta = mutate(dat_list$Perturbation$Meta, Symbol = str_to_upper(Symbol)),
     bind_mat = dat_list$Binding$Ortho$QN_log,
     perturb_mat = dat_list$Perturbation$Ortho$Pval_mat,
     ranking_list = rank_list$Ortho)
 })
-names(ortho) <- tfs_mm
-  
+names(ortho) <- tfs_hg
+
 
 # Summarize the percentile AUPRC of the observed aggregated rankings relative
 # to the distribution of all individual ChIP-seq and perturbation experiments,
@@ -217,14 +276,45 @@ gt_list <- list(
 # CLO:0003679 (Human ErythroLeukemia) and CLO:0007050 (K562) most common cell types
 # in low-throughput. So benchmark may be biased towards individual experiments
 # of that cellular context
-gt_list$Human$RUNX1 %>% arrange(desc(AUPRC)) %>% head
-sort(table(filter(lt_all, str_to_title(TF_Symbol) == "Runx1")$Cell_Type))
+
+top_runx1 <- gt_list$Human$RUNX1 %>% arrange(desc(AUPRC))
+sort(table(filter(lt_all, str_to_upper(TF_Symbol) == "RUNX1")$Cell_Type))
 
 # Further, most performant mouse Neurod1 experiments tend to be pancreatic.
 # Correspondingly, UBERON:0001264 (pancreas) is one of the top curated cell types
 # (although max is cochlea... also lots of NAs)
-gt_list$Mouse$Neurod1 %>% arrange(desc(AUPRC)) %>% head
-sort(table(filter(lt_all, str_to_title(TF_Symbol) == "Neurod1")$Cell_Type))
+
+top_neurod1 <- gt_list$Mouse$Neurod1 %>% arrange(desc(AUPRC))
+sort(table(filter(lt_all, str_to_upper(TF_Symbol) == "NEUROD1")$Cell_Type))
+
+# Topn 500 overlap of the highest performant Neurod1 pair
+# ol_neurod1 <- ol_list$sim_list$Mouse$Pval_Genes[[top_neurod1$ID[1]]]
+ol_neurod1 <- ol_list$sim_list$Mouse$Pval_Genes[["GSE30298_Neurod1_Mouse_Pancreatic-islets:GSE122992_Neurod1_Mouse_Overexpression"]]
+targets_neurod1 <- filter(rank_list$Mouse$Neurod1, Curated_target)$Symbol
+intersect(ol_neurod1, targets_neurod1)
+
+
+# Rank product ordering of top pair
+# TODO: shorthand for rank product
+
+exp_chip <- data.frame(Bind = dat_list$Binding$Mouse$QN_log[, "GSE30298_Neurod1_Mouse_Pancreatic-islets"]) %>% rownames_to_column(var = "Symbol")
+exp_perturb <- data.frame(Perturb = dat_list$Perturbation$Mouse$Pval_mat[, "GSE122992_Neurod1_Mouse_Overexpression"]) %>% rownames_to_column(var = "Symbol")
+
+exp_df <- left_join(exp_chip, exp_perturb, by = "Symbol") %>% 
+  mutate(Bind = rank(-Bind),
+         Perturb = rank(Perturb),
+         RP = rank(Bind/nrow(exp_chip) * Perturb/nrow(exp_perturb)))
+
+filter(exp_df, Symbol %in% ol_neurod1)
+filter(exp_df, Symbol %in% targets_neurod1)
+
+# Mafa, G6pc2, Ins1, Ins2 example of curated targets with high rank product
+# ranking between the top experiment pair but not in the aggregated rankings.
+# Pancreatic genes
+
+diff_df <- rank_list$Mouse$Neurod1 %>% 
+  filter(Curated_target) %>% 
+  left_join(exp_df, by = "Symbol")
 
 
 # Plots
@@ -243,31 +333,46 @@ p1 <- n_target %>%
   mutate(Symbol = factor(Symbol, levels = unique(Symbol))) %>%
   ggplot(., aes(x = Symbol, y = Count)) +
   geom_bar(stat = "identity", fill = "slategrey", colour = "black") +
-  ylab("Count of curated targets") +
+  ylab("Count of unique curated targets") +
   scale_y_continuous(breaks = seq(0, 160, 40)) +
   theme_classic() +
-  theme(axis.title = element_text(size = 25),
+  theme(axis.title = element_text(size = 35),
         axis.title.x = element_blank(),
-        axis.text.y = element_text(size = 25),
-        axis.text.x = element_text(size = 20),
-        plot.title = element_text(size = 25))
+        axis.text.y = element_text(size = 30),
+        axis.text.x = element_text(size = 25, angle = 90, vjust = 0.5, hjust = 1))
 
 
-ggsave(p1, dpi = 300, device = "png", height = 8, width = 12,
+p2 <- 
+  ggplot(n_type, aes(fill = Experiment_Type, y = Count, x = TF_Symbol)) + 
+  geom_bar(position = "stack", stat = "identity") +
+  ylab("Count of experiments") +
+  theme_classic() +
+  scale_fill_manual(values = c('#66c2a5','#fc8d62','#8da0cb','#e78ac3')) +
+  theme(axis.title = element_text(size = 35),
+        axis.title.x = element_blank(),
+        axis.text.y = element_text(size = 30),
+        axis.text.x = element_text(size = 25, angle = 90, vjust = 0.5, hjust = 1),
+        legend.text = element_text(size = 25),
+        legend.title = element_text(size = 25),
+        legend.position = c(0.75, 0.85))
+
+
+
+ggsave(plot_grid(p1, p2), dpi = 300, device = "png", height = 12, width = 24,
        filename = paste0(plot_dir, "count_curated_all.png"))
 
 
 # Boxplot of ranks by presence in low-throughput
 
 
-plot_box <- function(df, tf, wilx) {
+plot_box <- function(df, tf, wilx, tf_pal) {
   
   perturb <- ggplot(df, aes(x = Curated_target, y = Count_DE)) +
     geom_boxplot(width = 0.3, fill = "white", outlier.shape = NA) +
     geom_jitter(data = df[df$Curated_target,],
                 aes(x = Curated_target, y = Count_DE),
                 size = 3, height = 0, width = 0.1, shape = 21, alpha = 0.25,
-                fill = tf_pal[str_to_title(tf)]) +
+                fill = tf_pal[tf]) +
     labs(title = tf,
          subtitle = paste0("P-value=", wilx[tf, "Perturbation"])) + 
     ylab("Count DE (FDR < 0.1)") +
@@ -286,7 +391,7 @@ plot_box <- function(df, tf, wilx) {
     geom_jitter(data = df[df$Curated_target,],
                 aes(x = Curated_target, y = Mean_bind),
                 size = 3, height = 0, width = 0.2, shape = 21, alpha = 0.25,
-                fill = tf_pal[str_to_title(tf)]) +
+                fill = tf_pal[tf]) +
     labs(title = tf,
          subtitle = paste0("P-value=", wilx[tf, "Binding"])) + 
     ylab("Mean binding score") +
@@ -305,20 +410,24 @@ plot_box <- function(df, tf, wilx) {
 
 
 
-plist_hg1 <- lapply(tfs_hg, function(x) plot_box(rank_list$Human[[x]], tf = x, wilx = wilx_list$Human)) 
+plist_hg1 <- lapply(tfs_hg, function(x) {
+  plot_box(rank_list$Human[[x]], tf = x, wilx = wilx_list$Human, tf_pal = tf_pal_hg)
+}) 
 names(plist_hg1) <- tfs_hg
 
-plist_mm1 <- lapply(tfs_mm, function(x) plot_box(rank_list$Mouse[[x]], tf = x, wilx = wilx_list$Mouse)) 
+plist_mm1 <- lapply(tfs_mm, function(x) {
+  plot_box(rank_list$Mouse[[x]], tf = x, wilx = wilx_list$Mouse, tf_pal = tf_pal_mm)
+}) 
 names(plist_mm1) <- tfs_mm
 
 
 ggsave(plot_grid(plotlist = plist_hg1, ncol = 2),
-       dpi = 300, device = "png", height = 20, width = 20,
+       dpi = 300, device = "png", height = 20, width = 20, bg = "white",
        filename = paste0(plot_dir, "aggregated_scores_by_curated_human_", date, ".png"))
 
 
 ggsave(plot_grid(plotlist = plist_mm1, ncol = 2),
-       dpi = 300, device = "png", height = 20, width = 20,
+       dpi = 300, device = "png", height = 20, width = 20, bg = "white",
        filename = paste0(plot_dir, "aggregated_scores_by_curated_mouse_", date, ".png"))
 
 
@@ -326,7 +435,7 @@ ggsave(plot_grid(plotlist = plist_mm1, ncol = 2),
 # Precision vs recall curves
 
 
-plot_pr <- function(pr_list, auc_df, tf) {
+plot_pr <- function(pr_list, auc_df, tf, colours) {
   
   auc_labels <- c(
     Integrated = paste0("Integrated (AUC=", signif(auc_df[tf, "Integrated"], 3), ")"),
@@ -338,7 +447,7 @@ plot_pr <- function(pr_list, auc_df, tf) {
     geom_path(data = pr_list$Perturbation, aes(x = Recall, y = Precision, col = "Perturbation"), size = 1) +
     geom_path(data = pr_list$Binding, aes(x = Recall, y = Precision, col = "Binding"), size = 1) +
     ggtitle(tf) +
-    scale_color_manual(labels = auc_labels, values = rank_cols) +
+    scale_color_manual(labels = auc_labels, values = colours) +
     theme_classic() +
     theme(axis.text = element_text(size = 25),
           axis.title = element_text(size = 25),
@@ -351,13 +460,13 @@ plot_pr <- function(pr_list, auc_df, tf) {
 
 
 plist_hg2 <- lapply(tfs_hg, function(x) {
-  plot_pr(pr_list$Human[[x]], auc_df = auprc_list$Human, tf = x)
+  plot_pr(pr_list$Human[[x]], auc_df = auprc_list$Human, tf = x, colours = rank_cols)
 })
 names(plist_hg2) <- tfs_hg
 
 
 plist_mm2 <- lapply(tfs_mm, function(x) {
-  plot_pr(pr_list$Mouse[[x]], auc_df = auprc_list$Mouse, tf = x)
+  plot_pr(pr_list$Mouse[[x]], auc_df = auprc_list$Mouse, tf = x, colours = rank_cols)
 })
 names(plist_mm2) <- tfs_mm
 
@@ -420,8 +529,8 @@ plot_sample_auprc <- function(sample_list, auprc_df, tf) {
           plot.title = element_text(size = 25),
           legend.title = element_blank(),
           legend.text = element_text(size = 25),
-          legend.position = c(0.9, 0.9))
-          # legend.position = "bottom")
+          legend.position = c(0.90, 0.90),
+          plot.margin = margin(10, 20, 10, 10))
 }
 
 
@@ -466,9 +575,8 @@ proportion_table <- function(prop_df, outfile) {
 }
 
 
-proportion_table(perc_list$Human, paste0(plot_dir, "Human_sampled_AUPRC_gt_observed_table.png"))
-proportion_table(perc_list$Mouse, paste0(plot_dir, "Mouse_sampled_AUPRC_gt_observed_table.png"))
-proportion_table(perc_list$Ortho, paste0(plot_dir, "Ortho_sampled_AUPRC_gt_observed_table.png"))
+proportion_table(prop_list$Human, paste0(plot_dir, "Human_sampled_AUPRC_gt_observed_table.png"))
+proportion_table(prop_list$Mouse, paste0(plot_dir, "Mouse_sampled_AUPRC_gt_observed_table.png"))
 
 
 # Distribution of individual experiment AUPRCs overlaid with observed aggregated
@@ -488,13 +596,10 @@ plot_group_auprc <- function(auprc_list, tf) {
     theme_classic() +
     theme(axis.text = element_text(size = 25),
           axis.title = element_text(size = 25),
-          # axis.title.x = element_blank(),
           plot.title = element_text(size = 25),
-          # legend.title = element_blank(),
           legend.title = element_text(size = 25),
-          legend.text = element_text(size = 25))
-  # legend.position = "top")
-  
+          legend.text = element_text(size = 25),
+          plot.margin = margin(10, 20, 10, 10))
 }
 
 
@@ -504,13 +609,13 @@ names(plist_hg4) <- tfs_hg
 plist_mm4 <- lapply(tfs_mm, function(x) plot_group_auprc(mm[[x]], x))
 names(plist_mm4) <- tfs_mm
 
-plist_ortho4 <- lapply(tfs_mm, function(x) plot_group_auprc(ortho[[x]], x))
-names(plist_ortho4) <- tfs_mm
+plist_ortho4 <- lapply(tfs_hg, function(x) plot_group_auprc(ortho[[x]], x))
+names(plist_ortho4) <- tfs_hg
 
 
 # save out ASCL1 with no legend for publication
 ggsave(plist_hg4$ASCL1 + theme(legend.position = "none"), 
-       dpi = 300, device = "png", height = 8, width = 10,
+       dpi = 300, device = "png", height = 8, width = 12,
        filename = paste0(plot_dir, "Human_ASCL1_single_experiment_AUPRC.png"))
 
 
@@ -541,93 +646,3 @@ percentile_table <- function(perc_df, outfile) {
 percentile_table(perc_list$Human, paste0(plot_dir, "Human_aggregate_AUPRC_percentile_table.png"))
 percentile_table(perc_list$Mouse, paste0(plot_dir, "Mouse_aggregate_AUPRC_percentile_table.png"))
 percentile_table(perc_list$Ortho, paste0(plot_dir, "Ortho_aggregate_AUPRC_percentile_table.png"))
-
-
-
-## DEMO plots
-
-# heatmap of proportion 
-
-# mat <- prop_list$Human
-# colnames(mat) <- c("Integrated", "Binding", "Perturbation")
-# mat <- ifelse(mat > 0.05, 0, 1)
-# 
-# px1 <- 
-#   reshape2::melt(mat) %>% 
-#   ggplot(., aes(x = Var2, y = Var1, fill = factor(value))) +
-#   geom_tile(colour = "black", lwd = 1.1) +
-#   scale_fill_manual(values = c("white", "slategrey"),
-#                     labels = c("FALSE", "TRUE")) +
-#   guides(fill = guide_legend(title = "Proportion < 0.05")) +
-#   theme_classic() +
-#   theme(axis.title = element_blank(),
-#         axis.text.y = element_text(size = 25),
-#         axis.text.x = element_text(size = 25, angle = 90, vjust = 0.5, hjust = 1))
-# 
-# 
-# ggsave(px1, dpi = 300, device = "png", height = 8, width = 6,
-#        filename = paste0(plot_dir, "Human_AUPRC_sample_proportion.png"))
-
-
-# mat <- prop_list$Human
-# mat <- ifelse(mat > 0.05, 0, 1)
-# 
-# px1 <- 
-#   reshape2::melt(mat) %>% 
-#   ggplot(., aes(x = Var2, y = Var1, fill = factor(value))) +
-#   geom_tile(colour = "black", lwd = 1.1) +
-#   scale_fill_manual(values = c("white", "slategrey"),
-#                     labels = c("FALSE", "TRUE")) +
-#   guides(fill = guide_legend(title = "P-value(?) < 0.05")) +
-#   theme_classic() +
-#   theme(axis.title = element_blank(),
-#         axis.text.y = element_text(size = 25),
-#         axis.text.x = element_text(size = 25))
-
-
-
-# pal <- rev(RColorBrewer::brewer.pal(11, "RdYlGn"))
-# pal <- rev(c('#d73027','#f46d43','#fdae61','#fee08b','#d9ef8b','#a6d96a','#66bd63','#1a9850'))
-
-
-# heatmap of wilx test pvals
-
-# a <- wilx_list$Mouse
-# a[a < 5e-2 & a > 5e-5] <- 1
-# a[a < 5e-5 & a > 5e-10] <- 2
-# a[a < 5e-10] <- 3
-# a[a > 0 & a < 1] <- 0
-# 
-# a <- data.frame(a) %>%
-#   rownames_to_column(var = "Symbol")
-# a <- reshape2::melt(a, id.vars = "Symbol")
-# 
-# ggplot(a, aes(x = variable, y = Symbol, fill = factor(value))) +
-#   geom_tile() +
-#   theme_classic() +
-#   theme_classic() +
-#   scale_fill_manual(values = c("grey", "#fee0d2", "#fc9272", "#de2d26"),
-#                     labels = c("pval > 5e-2", "5e-5 < pval < 5e-2", "5e-10 < pval < 5e-5", "pval < 5e-10")) +
-#   guides(fill = guide_legend(title = "Wilcoxon test")) +
-#   theme(axis.title = element_blank(),
-#         axis.text.y = element_text(size = 25),
-#         axis.text.x = element_text(size = 25),
-#         legend.text = element_text(size = 15),
-#         legend.title = element_text(size = 20))
-# 
-# 
-# a <- wilx_list$Human
-# a <- data.frame(a) %>%
-#   rownames_to_column(var = "Symbol")
-# a <- reshape2::melt(a, id.vars = "Symbol")
-# 
-# ggplot(a, aes(x = variable, y = Symbol, fill = -log10(value))) +
-#   geom_tile() +
-#   theme_classic() +
-#   theme_classic() +
-#   # guides(fill = guide_legend(title = "Wilcoxon test")) +
-#   theme(axis.title = element_blank(),
-#         axis.text.y = element_text(size = 25),
-#         axis.text.x = element_text(size = 25),
-#         legend.text = element_text(size = 15),
-#         legend.title = element_text(size = 20))
