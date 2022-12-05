@@ -80,7 +80,8 @@ if (!file.exists(outfile)) {
     )
   )
   
-  saveRDS(list(sim_list = sim_list, df_list = df_list), file = outfile)
+  saveRDS(list(sim_list = sim_list, df_list = df_list), 
+          file = outfile)
   
 } else {
   
@@ -254,20 +255,24 @@ cor_list <- lapply(cor_list, function(mat) {
 
 
 
-tf_colour = list(Symbol = tf_pal)
+heatmap_pal <- colorRampPalette(c("#0571b0", "white", "#ca0020"))(pal_length)
 
 
 plot_heatmap <- function(mat, 
                          meta, 
                          file, 
                          col_min = -1, 
-                         col_max = 1) {
+                         col_max = 1,
+                         ortho = FALSE,
+                         tf_pal,
+                         pal_length = 100,
+                         heatmap_pal) {
   
   # Anno for colours
-  anno <- meta %>% 
-    mutate(Symbol = str_to_title(Symbol)) %>% 
-    dplyr::select(Symbol)
   
+  if (ortho) meta <- mutate(meta, Symbol = str_to_upper(Symbol))
+  
+  anno <- dplyr::select(meta, Symbol)
   rownames(anno) <- rownames(mat)
   
   color_breaks <- seq(col_min, col_max, length.out = pal_length)
@@ -285,13 +290,13 @@ plot_heatmap <- function(mat,
     show_colnames = FALSE,
     na_col = "white",
     border_color = "white",
-    color = bluered_pal,
+    color = heatmap_pal,
     breaks = color_breaks,
     annotation_row = anno,
     annotation_col = anno,
     annotation_names_row = FALSE,
     annotation_names_col = FALSE,
-    annotation_colors = tf_colour,
+    annotation_colors = tf_pal,
     gaps_row = cuts,
     gaps_col = cuts,
     legend = TRUE,
@@ -304,12 +309,19 @@ plot_heatmap <- function(mat,
 
 plot_heatmap(mat = cor_list$Mouse, 
              meta = filter(meta, Species == "Mouse"),
+             tf_pal = list(Symbol = tf_pal_mm),
+             heatmap_pal = heatmap_pal,
              file = paste0(plot_dir, "cor_heatmap_mouse_", date, ".png"))
 
 plot_heatmap(mat = cor_list$Human, 
              meta = filter(meta, Species == "Human"),
+             tf_pal = list(Symbol = tf_pal_hg),
+             heatmap_pal = heatmap_pal,
              file = paste0(plot_dir, "cor_heatmap_human_", date, ".png"))
 
 plot_heatmap(mat = cor_list$Ortho, 
              meta = meta, 
+             ortho = TRUE,
+             tf_pal = list(Symbol = tf_pal_hg),
+             heatmap_pal = heatmap_pal,
              file = paste0(plot_dir, "cor_heatmap_ortho_", date, ".png"))
