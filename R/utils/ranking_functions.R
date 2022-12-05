@@ -245,7 +245,7 @@ all_experiment_auprc <- function(tf,
   rp_df <- reshape2::melt(rp_auprcs)
   rp_df$L2 <- colnames(bind_mat)[rp_df$L2]
   rp_df$L1 <- colnames(perturb_mat)[rp_df$L1]
-  rp_df$ID <- paste(rp_df$L1, rp_df$L2, sep = "_")
+  rp_df$ID <- paste(rp_df$L2, rp_df$L1, sep = ":")
   
   # Summary df
   auprc_df <- data.frame(
