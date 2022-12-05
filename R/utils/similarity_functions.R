@@ -60,8 +60,8 @@ format_pair_df <- function(mat, symmetric = TRUE, perturb = FALSE) {
   geo1 <- row_split[, 1]
   geo2 <- col_split[, 1]
   
-  tf1 <- str_to_title(row_split[, 2])
-  tf2 <- str_to_title(col_split[, 2])
+  tf1 <- str_to_upper(row_split[, 2])
+  tf2 <- str_to_upper(col_split[, 2])
   
   species1 <- row_split[, 3]
   species2 <- col_split[, 3]
