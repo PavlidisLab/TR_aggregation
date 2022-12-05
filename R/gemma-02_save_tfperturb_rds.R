@@ -73,7 +73,7 @@ prep_rs_list <- function(rs_list, meta, symbol_hg, symbol_mm, cores) {
     }
     
     x <- rs_list[[x]] %>%
-      filter(Symbol %in% symbol) %>% 
+      filter(Symbol %in% symbol) %>%
       keep_single_symbols() %>%
       filter_by_max_tstat()
     
