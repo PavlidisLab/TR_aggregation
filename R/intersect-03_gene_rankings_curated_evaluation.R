@@ -339,7 +339,7 @@ p1 <- n_target %>%
   theme(axis.title = element_text(size = 35),
         axis.title.x = element_blank(),
         axis.text.y = element_text(size = 30),
-        axis.text.x = element_text(size = 25, angle = 90, vjust = 0.5, hjust = 1))
+        axis.text.x = element_text(size = 30, angle = 90, vjust = 0.5, hjust = 1))
 
 
 p2 <- 
@@ -351,9 +351,9 @@ p2 <-
   theme(axis.title = element_text(size = 35),
         axis.title.x = element_blank(),
         axis.text.y = element_text(size = 30),
-        axis.text.x = element_text(size = 25, angle = 90, vjust = 0.5, hjust = 1),
-        legend.text = element_text(size = 25),
-        legend.title = element_text(size = 25),
+        axis.text.x = element_text(size = 30, angle = 90, vjust = 0.5, hjust = 1),
+        legend.text = element_text(size = 30),
+        legend.title = element_text(size = 30),
         legend.position = c(0.75, 0.85))
 
 
@@ -376,11 +376,9 @@ plot_box <- function(df, tf, wilx, tf_pal) {
     labs(title = tf,
          subtitle = paste0("P-value=", wilx[tf, "Perturbation"])) + 
     ylab("Count DE (FDR < 0.1)") +
-    # ggtitle(tf) +
     theme_classic() +
     scale_y_continuous(breaks = pretty_breaks) +
     theme(axis.title = element_text(size = 25),
-          # axis.title.x = element_blank(),
           axis.text.y = element_text(size = 25),
           axis.text.x = element_text(size = 25),
           plot.title = element_text(size = 20),
@@ -395,10 +393,8 @@ plot_box <- function(df, tf, wilx, tf_pal) {
     labs(title = tf,
          subtitle = paste0("P-value=", wilx[tf, "Binding"])) + 
     ylab("Mean binding score") +
-    # ggtitle(tf) +
     theme_classic() +
     theme(axis.title = element_text(size = 25),
-          # axis.title.x = element_blank(),
           axis.text.y = element_text(size = 25),
           axis.text.x = element_text(size = 25),
           plot.title = element_text(size = 20),
@@ -479,34 +475,6 @@ ggsave(plist_mm2$Pax6, dpi = 300, device = "png", height = 8, width = 8,
        filename = paste0(plot_dir, "Mouse_pax6_precisionrecall.png"))
 
 
-# Table of AUPRC values
-
-
-auprc_table <- function(auprc_df, outfile) {
-  
-  pheatmap(auprc_df,
-           cluster_cols = FALSE,
-           cluster_rows = FALSE,
-           color = "white",
-           display_numbers = TRUE,
-           number_format = "%.3f",
-           number_color = "black",
-           fontsize = 20,
-           legend = FALSE,
-           cellwidth = 50,
-           cellheight = 50,
-           angle_col = 90,
-           labels_col = c("Integrated", "Binding", "Perturbation"),
-           width = 4.5,
-           height = 7.5,
-           filename = outfile)
-}
-
-
-auprc_table(auprc_list$Human, paste0(plot_dir, "Human_AUPRC_table.png"))
-auprc_table(auprc_list$Mouse, paste0(plot_dir, "Mouse_AUPRC_table.png"))
-auprc_table(auprc_list$Ortho, paste0(plot_dir, "Ortho_AUPRC_table.png"))
-
 
 # Distn of sampled AUPRCs overlaid with observed
 
@@ -551,33 +519,6 @@ ggsave(plist_hg3$ASCL1, dpi = 300, device = "png", height = 8, width = 12,
        filename = paste0(plot_dir, "Human_ASCL1_sample_AUPRC.png"))
 
 
-# Table of proportion of sampled target AUPRCs that were greater than observed aggregated
-
-
-proportion_table <- function(prop_df, outfile) {
-  
-  pheatmap(prop_df,
-           cluster_cols = FALSE,
-           cluster_rows = FALSE,
-           color = "white",
-           display_numbers = TRUE,
-           number_format = "%.3f",
-           number_color = "black",
-           fontsize = 20,
-           legend = FALSE,
-           cellwidth = 50,
-           cellheight = 50,
-           angle_col = 90,
-           labels_col = c("Integrated", "Binding", "Perturbation"),
-           width = 4.5,
-           height = 7.5,
-           filename = outfile)
-}
-
-
-proportion_table(prop_list$Human, paste0(plot_dir, "Human_sampled_AUPRC_gt_observed_table.png"))
-proportion_table(prop_list$Mouse, paste0(plot_dir, "Mouse_sampled_AUPRC_gt_observed_table.png"))
-
 
 # Distribution of individual experiment AUPRCs overlaid with observed aggregated
 
@@ -590,7 +531,7 @@ plot_group_auprc <- function(auprc_list, tf) {
     geom_hline(aes(yintercept = auprc_list$AUPRC_agg$Integrated, col = "Integrated"), size = 1, linetype = "solid") +
     geom_hline(aes(yintercept = auprc_list$AUPRC_agg$Perturbation, col = "Perturbation"), size = 1, linetype = "solid") +
     geom_hline(aes(yintercept = auprc_list$AUPRC_agg$Binding, col = "Binding"), size = 1, linetype = "solid") +
-    scale_color_manual("Integrated: ", values = rank_cols, labels = c("Integrated", "Binding", "Perturbation")) +
+    scale_color_manual("Integrated: ", values = rank_cols, breaks = names(rank_cols)) +
     scale_x_discrete("Individual experiments", labels = c("Binding", "Perturbation", "Rank product")) +
     ggtitle(paste0(tf, ": Aggregated relative to individual experiments")) +
     theme_classic() +
@@ -619,19 +560,19 @@ ggsave(plist_hg4$ASCL1 + theme(legend.position = "none"),
        filename = paste0(plot_dir, "Human_ASCL1_single_experiment_AUPRC.png"))
 
 
-# Table of percentile of aggregated AUPRCS relative to distn of individual experiments
+# Table of AUPRC values
 
 
-percentile_table <- function(perc_df, outfile) {
+heatmap_table <- function(auprc_df, outfile) {
   
-  pheatmap(perc_df,
+  pheatmap(auprc_df,
            cluster_cols = FALSE,
            cluster_rows = FALSE,
            color = "white",
            display_numbers = TRUE,
            number_format = "%.3f",
            number_color = "black",
-           fontsize = 20,
+           fontsize = 22,
            legend = FALSE,
            cellwidth = 50,
            cellheight = 50,
@@ -643,6 +584,17 @@ percentile_table <- function(perc_df, outfile) {
 }
 
 
-percentile_table(perc_list$Human, paste0(plot_dir, "Human_aggregate_AUPRC_percentile_table.png"))
-percentile_table(perc_list$Mouse, paste0(plot_dir, "Mouse_aggregate_AUPRC_percentile_table.png"))
-percentile_table(perc_list$Ortho, paste0(plot_dir, "Ortho_aggregate_AUPRC_percentile_table.png"))
+heatmap_table(auprc_list$Human, paste0(plot_dir, "Human_AUPRC_table.png"))
+heatmap_table(auprc_list$Mouse, paste0(plot_dir, "Mouse_AUPRC_table.png"))
+heatmap_table(auprc_list$Ortho, paste0(plot_dir, "Ortho_AUPRC_table.png"))
+
+# Table of proportion of sampled target AUPRCs that were greater than observed aggregated
+
+heatmap_table(prop_list$Human, paste0(plot_dir, "Human_sampled_AUPRC_gt_observed_table.png"))
+heatmap_table(prop_list$Mouse, paste0(plot_dir, "Mouse_sampled_AUPRC_gt_observed_table.png"))
+
+# Table of percentile of aggregated AUPRCS relative to distn of individual experiments
+
+heatmap_table(perc_list$Human, paste0(plot_dir, "Human_aggregate_AUPRC_percentile_table.png"))
+heatmap_table(perc_list$Mouse, paste0(plot_dir, "Mouse_aggregate_AUPRC_percentile_table.png"))
+heatmap_table(perc_list$Ortho, paste0(plot_dir, "Ortho_aggregate_AUPRC_percentile_table.png"))
