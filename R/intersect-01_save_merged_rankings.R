@@ -1,15 +1,15 @@
 ## Loads and organizes the ChIP-seq and perturbation data matrices into a single
 ## list for export, and creates a single data frame for each TR/species of the 
-# summarized/aggregated target rankings for export.
+## summarized/aggregated target rankings for export.
 ## -----------------------------------------------------------------------------
 
 library(plyr)
 library(tidyverse)
-library(data.table)  # frank() for rank using two variables
 source("R/setup-01_config.R")
+source("R/utils/ranking_functions.R")
 
-# rank for the final ranking dfs by TR 
-# dat collects all the contributing summarized data into one list
+# rank is for the list of final ranking dfs for each TR 
+# dat is for the list that collects all effect size matrices and meta
 rank_outfile <- paste0(scratch_dir, date, "_ranked_target_list.RDS")
 dat_outfile <- paste0(scratch_dir, date, "_all_data_list.RDS")
 
@@ -21,7 +21,6 @@ perturb_ortho <- readRDS(paste0(pmat_dir, "ortho_list_perturb_matrix_", date, ".
 tf_de <- readRDS(paste0(expr_dir, "TF_perturb_DE_counts_list_by_TF_FDR01_", date, ".RDS"))
 
 # Loading ChIP-seq data
-chip_type <- "QN_log"  # which chip processing scheme to use
 chip_meta <- read.delim(paste0(meta_dir, "Chipseq/batch1_chip_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
 chip_hg <- readRDS(paste0(cmat_dir, "Human_refseq_", date, "_processed_bindmat_list_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=FALSE_binary=", binary_dist/1e3, "kb.RDS"))
 chip_mm <- readRDS(paste0(cmat_dir, "Mouse_refseq_", date, "_processed_bindmat_list_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=FALSE_binary=", binary_dist/1e3, "kb.RDS"))
@@ -35,11 +34,94 @@ lt_curated <- read.delim(paste0(meta_dir, "Curated_targets_all_July2022.tsv"), s
 pc_ortho <- read.delim(paste0(meta_dir, "hg_mm_1to1_ortho_genes_DIOPT-v8.tsv"), stringsAsFactors = FALSE)
 
 
-# Organize all effect size matrices and metadata tables into a single list
+# Each data type has its own global filtering steps. For simplicity, only 
+# keeping genes that survived filtering across both. First describe genes 
+# present in one method but not the other (and thus will be removed)
 # ------------------------------------------------------------------------------
 
 
-# filtering rules for each data type may lead to unequal coverage - keep common
+chip_not_perturb <- list(
+  Human = setdiff(rownames(chip_hg$QN_log), 
+                  rownames(perturb_hg$FC_mat)),
+  Mouse = setdiff(rownames(chip_mm$QN_log), 
+                  rownames(perturb_mm$FC_mat))
+)
+
+
+perturb_not_chip <- list(
+  Human = setdiff(rownames(perturb_hg$FC_mat),
+                  rownames(chip_hg$QN_log)),
+  Mouse = setdiff(rownames(perturb_mm$FC_mat),
+                  rownames(chip_mm$QN_log))
+)
+
+
+# Find many more genes (3200+) in mouse perturb relative to mouse chip. Olf or 
+# Gm* are common.
+
+
+n_chip_only <- lapply(chip_not_perturb, length)
+n_perturb_only <- lapply(perturb_not_chip, length)
+
+
+# Find that the genes not in the chip matrix tend to have a lot of NAs in the
+# perturb matrix (median ~75% in both species). However, there are examples of
+# genes that are frequently measured and have DE counts. CPS1 in human is
+# measured in 71/77 experiments and DE in 18/71, but has been filtered in chip
+# mat. Similarly, Slc25a37 in mouse has been measured in all 165 experiments and
+# is DE in 17/165, but was filtered from chip mat due to low counts.
+
+
+prop_na <- function(mat, meta, species) {
+  
+  apply(mat, 1, function(x) {
+    sum(is.na(x)) / sum(meta$Species == species)
+  }) 
+}
+
+
+na_list <- list(
+  Human = prop_na(perturb_hg$FC_mat[perturb_not_chip$Human, ], perturb_meta, "Human"),
+  Mouse = prop_na(perturb_mm$FC_mat[perturb_not_chip$Mouse, ], perturb_meta, "Mouse")
+)
+
+na_summ <- lapply(na_list, summary)
+na_min <- lapply(na_list, function(x) names(x[x == min(x)]))
+min_de_hg <- rowSums(perturb_hg$FDR_mat[na_min$Human, ] < 0.05, na.rm = TRUE)
+min_de_mm <- rowSums(perturb_mm$FDR_mat[na_min$Mouse, ] < 0.05, na.rm = TRUE)
+
+
+# Genes not in the perturb matrix have lower scores across experiments, but 
+# there are examples of these genes ranking highly in individual experiments.
+# KRTAP4-16 high in set of human ASCL1 experiments (note already see keratin 
+# cluster genes high in ASCL1). H2ac18 high in mouse Runx1.
+
+
+chip_only_mean <- list(
+  Human = rowMeans(chip_hg$QN_log[chip_not_perturb$Human,]),
+  Mouse = rowMeans(chip_mm$QN_log[chip_not_perturb$Mouse,])
+)
+
+mean_summ <- lapply(chip_only_mean, summary)
+
+chip_only_rank <- list(
+  Human = apply(-chip_hg$QN_log, 2, rank)[chip_not_perturb$Human, ],
+  Mouse = apply(-chip_mm$QN_log, 2, rank)[chip_not_perturb$Mouse, ]
+)
+
+rank_summ <- lapply(chip_only_rank, function(x) summary(t(x)))
+
+rank_head <- lapply(chip_only_rank, function(x) {
+  apply(x, 1, function(y) head(sort(y)))
+})
+
+
+# head(sort(chip_hg$QN_log["KRTAP4-16", ], decreasing = TRUE), 10)
+# head(sort(chip_mm$QN_log["H2ac18", ], decreasing = TRUE), 10)
+
+
+# Effect matrices filtered for common genes into a list
+# ------------------------------------------------------------------------------
 
 
 filter_common <- function(mat_list, symbols) {
@@ -48,9 +130,9 @@ filter_common <- function(mat_list, symbols) {
 
 
 common <- list(
-  Human = intersect(rownames(chip_hg[[chip_type]]), rownames(perturb_hg$FC_mat)),
-  Mouse = intersect(rownames(chip_mm[[chip_type]]), rownames(perturb_mm$FC_mat)),
-  Ortho = intersect(rownames(chip_ortho[[chip_type]]), rownames(perturb_ortho$FC_mat))
+  Human = intersect(rownames(chip_hg$QN_log), rownames(perturb_hg$FC_mat)),
+  Mouse = intersect(rownames(chip_mm$QN_log), rownames(perturb_mm$FC_mat)),
+  Ortho = intersect(rownames(chip_ortho$QN_log), rownames(perturb_ortho$FC_mat))
 )
 
 
@@ -62,7 +144,7 @@ perturb_list <- list(
 )
 
 
-# For binding include raw binding scores, quantile norm of log10(mat+1) (used 
+# For binding include raw binding scores, quantile norm of log10(mat+1) (used
 # for most analysis), and the binary assignment
 
 
@@ -79,14 +161,9 @@ bind_list <- list(
 all_dat <- list(Binding = bind_list, Perturbation = perturb_list)
 
 
-# Join summarized TR tables from ChIP-seq and perturbation experiments so that 
-# each TR/species has a single dataframe of evidence per gene.
-# ChIP-seq: mean binding scores, proportion binary, binding specificity model output 
-# Perturbation experiments: DE counts, Average absolute FC, purity, DE prior
-# Then, add column for whether the given TR-gene pair has curated evidence.
-# Finally, add integer ranking of the aggregated ChIP-seq evidence (mean binding
-# score), aggregated perturbation (count DE, ties broken by average abs FC), and
-# an integrated ranking that takes the rank product between these two lists.
+# Get a list of dataframes for each TR/species that merges the aggregated 
+# evidence from ChIP-seq and perturbation experiments, and append the curation
+# status for the given gene, and the aggregated + integrated rankings. 
 # ------------------------------------------------------------------------------
 
 
@@ -99,6 +176,7 @@ prepare_bind_fit <- function(bind_fit) {
     dplyr::rename(Bind_logFC = logFC,
                   Bind_adj_Pval = adj.P.Val) %>% 
     dplyr::select(Symbol, Bind_logFC, Bind_adj_Pval)
+  
   return(bind_fit)
 }
 
@@ -110,8 +188,9 @@ get_targets <- function(curated_df,
                         tf, 
                         species,  # Human|Mouse|Ortho
                         ortho_genes = pc_ortho) {
-  
+
   if (species == "Human") {
+    
     targets <- curated_df %>%
       mutate(TF_Symbol = str_to_upper(TF_Symbol),
              Target_Symbol = str_to_upper(Target_Symbol)) %>%
@@ -120,6 +199,7 @@ get_targets <- function(curated_df,
       pull(Target_Symbol)
     
   } else if (species == "Mouse") {
+    
     targets <- curated_df %>%
       mutate(TF_Symbol = str_to_title(TF_Symbol),
              Target_Symbol = str_to_title(Target_Symbol)) %>%
@@ -128,10 +208,14 @@ get_targets <- function(curated_df,
       pull(Target_Symbol)
     
   } else if (species == "Ortho") {
-    curated_df <- mutate(curated_df, TF_Symbol = str_to_title(TF_Symbol)) %>% 
+    
+    curated_df <- curated_df %>% 
+      mutate(TF_Symbol = str_to_upper(TF_Symbol)) %>% 
       filter(TF_Symbol == tf)
+    
     hg <- filter(pc_ortho, Symbol_hg %in% curated_df$Target_Symbol)$ID
     mm <- filter(pc_ortho, Symbol_mm %in% curated_df$Target_Symbol)$ID
+    
     targets <- union(hg, mm)
   }
   
@@ -139,71 +223,54 @@ get_targets <- function(curated_df,
 }
 
 
-# Append the ranks of each gene for the perturbation evidence (count DE) and
-# the ChIP-seq binding signal (mean bind score). If FC_truebreak is TRUE,
-# then DE count ties are broken by the average absolute FC of the gene. Then
-# add the rank product of these two lines of evidence, as in the BETA algo.
-# Because "top ranked" genes from the RP have arbitrary small units, take
-# the rank of the rank product to yield a final integer rank where rank=1
-# has the strongest evidence.
-# BETA: https://pubmed.ncbi.nlm.nih.gov/24263090/
-# R application: https://pubmed.ncbi.nlm.nih.gov/32894066/
+# For a single TF, merge the perturbation/diff expr table, the bind fit table,
+# and the bind summary table, then append presence of curated targets, and
+# finally add the ranks of the lines of evidence.
 
-add_ranks <- function(df, FC_tiebreak = TRUE) {
-  
-  if (FC_tiebreak) {
-    
-    df$Rank_perturbation <- data.table::frank(
-      list(-df$Count_DE, -df$Avg_abs_FC), ties.method = "min")
-  
-  } else {
-    
-    df$Rank_perturbation <- rank(-df$Count_DE, ties.method = "min")
-  
-  }
-  
-  df$Rank_binding <- rank(-df$Mean_bind)
-  rank_prod <- df$Rank_binding/nrow(df) * df$Rank_perturbation/nrow(df)
-  df$Rank_integrated <- rank(rank_prod, ties.method = "min")
-  
-  return(arrange(df, Rank_integrated))
-}
-
-
-
-# For a single TF, merge the perturbation table, the bind fit table, and the
-# bind summary table, then append presence of curated targets, and finally
-# add the ranks of the lines of evidence
+# NOTE: A gene can survive the global perturbation filtering, but have all NAs
+# for a given TR-specific subset. The 'na_perturb' argument determines if the 
+# integrated ranking considers this information: if TRUE, genes with all perturb
+# NAs will be tied with the worst integrated ranking (even if the binding 
+# ranking is strong). If FALSE, the integrated ranking can still assign elevated
+# importance to all perturb NA genes if the corresponding binding evidence is 
+# still strong.
 
 merge_tf <- function(de_table,
                      bind_fit = NULL, 
                      bind_summary,
-                     curated_df = lt_curated,
+                     curated_df,
                      species,
-                     tf) {
+                     tf,
+                     na_perturb = FALSE) {
   
-  targets <- get_targets(curated_df = curated_df, species = species, tf = tf)
+  common_genes <- intersect(de_table$Symbol, bind_summary$Symbol)
+  de_table <- filter(de_table, Symbol %in% common_genes)
+  bind_summary <- filter(bind_summary, Symbol %in% common_genes)
+
   
   if (!is.null(bind_fit)) {  # ortho doesn't have bind fit
     
     bind_fit <- prepare_bind_fit(bind_fit)
-    merge_df <- plyr::join_all(list(de_table, bind_summary, bind_fit), by = "Symbol")
-  
+    
+    merge_df <- plyr::join_all(list(de_table, bind_summary, bind_fit), 
+                               by = "Symbol")
   } else {
     
     merge_df <- plyr::join_all(list(de_table, bind_summary), by = "Symbol")
-  
+    
   }
   
-  merge_df$Curated_target <- merge_df$Symbol %in% targets
-  merge_df <- add_ranks(merge_df)
+  targets <- get_targets(curated_df = curated_df, species = species, tf = tf)
+  
+  merge_df <- merge_df %>% 
+    mutate(Curated_target = Symbol %in% targets) %>% 
+    add_ranks(na_perturb = na_perturb)
   
   return(merge_df)
 }
 
 
-
-# Applies merge_tf over list of tables
+# Applies merge_tf over list of tables each named with specific TR
 
 merge_all <- function(de_list,
                       bind_fit_list = NULL,
