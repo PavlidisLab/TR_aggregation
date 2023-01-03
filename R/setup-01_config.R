@@ -230,26 +230,32 @@ iplot_dir <- "/home/amorin/Plots/Intersect/"
 # "/home/amorin/Plots/TF_perturb/Describe_FDR_counts/Human_ASCL1_example_purity_heatmap_Apr2022.png"
 
 # FS13 A, B, C, D, E
-#
-#
-#
-#
-#
+# "/home/amorin/Plots/Intersect/Experiment_similarity/Densplot_pval-intersect_all_human_Apr2022.png"
+# "/home/amorin/Plots/Intersect/Experiment_similarity/Densplot_pval-intersect_all_mouse_Apr2022.png"
+# "/home/amorin/Plots/Intersect/Experiment_similarity/Densplot_pval-intersect_all_ortho_Apr2022.png"
+# "/home/amorin/Plots/Intersect/Experiment_similarity/Vbplot_tf_human_intersect_Apr2022.png"
+# "/home/amorin/Plots/Intersect/Experiment_similarity/Vbplot_tf_mouse_intersect_Apr2022.png"
 
-# F6 B, C, D, E, F, G
-#
-#
-#
-#
+# F6 B, C, D, E, F, G (+/- legend to fit in Adobe)
+# "/home/amorin/Plots/Intersect/Gene_rankings/Human_ASCL1_precisionrecall.png"
+# "/home/amorin/Plots/Intersect/Gene_rankings/Human_ASCL1_sample_AUPRC.png"
+# "/home/amorin/Plots/Intersect/Gene_rankings/Human_ASCL1_single_experiment_AUPRC.png"
+# "/home/amorin/Plots/Intersect/Gene_rankings/Human_sampled_AUPRC_gt_observed_table.png"
+# "/home/amorin/Plots/Intersect/Gene_rankings/Human_aggregate_AUPRC_percentile_table.png"
 #
 
 # FS14
+# "/home/amorin/Plots/Intersect/Gene_rankings/aggregated_scores_by_curated_human_Apr2022.png"
 
 # FS15
+# "/home/amorin/Plots/Intersect/Gene_rankings/aggregated_scores_by_curated_mouse_Apr2022.png"
 
 # FS16 A, B, C
-#
-#
-#
-
-
+# "/home/amorin/Plots/Intersect/Gene_rankings/count_curated_all.png"
+# "/home/amorin/Plots/Intersect/Gene_rankings/Human_AUPRC_table.png
+# "/home/amorin/Plots/Intersect/Gene_rankings/Human_sampled_AUPRC_gt_observed_table.png"
+# "/home/amorin/Plots/Intersect/Gene_rankings/Human_aggregate_AUPRC_percentile_table.png"
+# "/home/amorin/Plots/Intersect/Gene_rankings/"Human_AUPRC_table.png"
+# "/home/amorin/Plots/Intersect/Gene_rankings/Mouse_sampled_AUPRC_gt_observed_table.png"
+# "/home/amorin/Plots/Intersect/Gene_rankings/Mouse_aggregate_AUPRC_percentile_table.png"
+# "/home/amorin/Plots/Intersect/Gene_rankings/Mouse_AUPRC_table.png"
