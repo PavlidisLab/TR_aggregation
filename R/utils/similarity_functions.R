@@ -442,3 +442,31 @@ tf_summary <- function(df) {
   
   return(tf_list)
 }
+
+
+
+# Proportion of peak overlap matrix using a list of GRanges as input
+# Rows and columns are the experiments of the input, where each element is 
+# the proportion of experiment i's peaks that overlap any peak in experiment j.
+# This is not a symmetric matrix - i can be a full subset of j, and j may have
+# many peaks with no overlap to i.
+# ------------------------------------------------------------------------------
+
+
+get_prop_mat <- function(exp_gr, cores) {
+  
+  l <- mclapply(names(exp_gr), function(i) {
+    
+    unlist(lapply(names(exp_gr), function(j) {
+      if (i == j) return(NA)
+      ol <- findOverlaps(exp_gr[[i]], exp_gr[[j]])
+      n_distinct(ol@from) / length(exp_gr[[i]])
+    }))
+    
+  }, mc.cores = cores)
+  
+  prop_mat <- do.call(cbind, l)
+  colnames(prop_mat) <- rownames(prop_mat) <- names(exp_gr)
+  
+  return(prop_mat)
+}
