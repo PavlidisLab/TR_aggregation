@@ -42,10 +42,10 @@ bin_list <- list("Human" = binmat_hg,
 
 # remove rows that have no binding 
 
-filter_nobind <- function(mat, rowsum_arg, round_arg = 10) {
+filter_nobind <- function(mat, rowsum_filt, round_arg = 10) {
   
   mat <- round(mat, round_arg)
-  no_bind <- which(rowSums(mat) < rowsum_arg)
+  no_bind <- which(rowSums(mat) < rowsum_filt)
   if (length(no_bind) > 0) mat <- mat[-no_bind,]
   
   return(mat)
@@ -54,9 +54,9 @@ filter_nobind <- function(mat, rowsum_arg, round_arg = 10) {
 
 # Remove no bind
 bs_filt <- list(
-  Human = filter_nobind(bs_list$Human, rowsum_arg = 1),
-  Mouse = filter_nobind(bs_list$Mouse, rowsum_arg = 3),
-  Ortho = filter_nobind(bs_list$Ortho, rowsum_arg = 1)
+  Human = filter_nobind(bs_list$Human, rowsum_filt = 1),
+  Mouse = filter_nobind(bs_list$Mouse, rowsum_filt = 3),
+  Ortho = filter_nobind(bs_list$Ortho, rowsum_filt = 1)
 )
 
 bin_filt <- lapply(bin_list, function(x) x[rowSums(x) != 0, ])
