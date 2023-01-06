@@ -1,19 +1,99 @@
 ## Code for precision-recall analysis of gene ranking's ability to recover
 ## curated targets.
-## TODO: consider breaking up all exp AUPRC function
-## TODO: collapse get_pr and get_vec_pr
-## TODO: param doc
 ## -----------------------------------------------------------------------------
 
 library(tidyverse)
 library(ROCR)
 library(DescTools)
 library(parallel)
+library(data.table)  # frank() for rank using two variables
+
+
+# Appends to df a column of the integer rank of perturbation evidence using the
+# count of differentially expressed genes and the average absolute fold change. 
+
+rank_perturb <- function(df) {
+  
+  stopifnot(c("Count_DE", "Avg_abs_FC") %in% colnames(df))
+  
+  df$Rank_perturbation <- data.table::frank(
+    list(-df$Count_DE, -df$Avg_abs_FC), ties.method = "min")
+  
+  return(df)
+}
+
+
+# Appends to df a column of the integer rank of the binding evidence using the 
+# mean binding score 
+
+rank_binding <- function(df) {
+  
+  stopifnot("Mean_bind" %in% colnames(df))
+  
+  df$Rank_binding <- rank(-df$Mean_bind, ties.method = "min")
+  
+  return(df) 
+}
+
+
+# Add the rank product of the perturbation and binding evidence, as in the BETA 
+# algo. Because "top ranked" genes from the RP have arbitrary small units, take
+# the rank of the rank product to yield a final integer rank where rank=1 has 
+# the strongest evidence.
+# na_perturb arg controls behavior for genes with all NAs for perturbation
+# data. If TRUE, these genes are treated as 'NAs' for rank product calculation 
+# and thus will be assigned low importance. If FALSE, the original perturb 
+# ranking is used, and the gene can still have elevated importance if the 
+# binding ranking is high.
+# BETA: https://pubmed.ncbi.nlm.nih.gov/24263090/
+# R application: https://pubmed.ncbi.nlm.nih.gov/32894066/
+
+
+rank_product <- function(df, na_perturb = FALSE) {
+  
+  stopifnot(
+    c("Rank_binding", "Rank_perturbation", "Avg_abs_FC") %in% colnames(df))
+  
+  if (na_perturb) {
+    
+    n_not_na <- sum(!is.na(df$Avg_abs_FC))
+    
+    df <- df %>%
+      mutate(
+        Temp_rank = ifelse(is.na(Avg_abs_FC), NA, Rank_perturbation),
+        Rank_prod = (Rank_binding / nrow(df)) * (Temp_rank / n_not_na),
+        Rank_integrated = rank(Rank_prod, ties.method = "min")
+      ) %>%
+      dplyr::select(-c(Temp_rank, Rank_prod))
+  
+  } else {
+      
+    rank_prod <- (df$Rank_binding/nrow(df)) * (df$Rank_perturbation/nrow(df))
+    df$Rank_integrated <- rank(rank_prod, ties.method = "min")
+  }
+  
+  return(df)
+}
+
+
+# Append the perturbation, binding, and rank product ("Rank_integrated") to df 
+# and order by rank integrated.
+
+add_ranks <- function(df, ...) {
+  
+  df %>% 
+    rank_binding() %>% 
+    rank_perturb() %>% 
+    rank_product(...) %>% 
+    arrange(Rank_integrated)
+  
+}
 
 
 # Uses the ROCR package to return a precision recall data frame where each entry
 # has the calculated P+R for the top k ranked genes presence in the curated
-# resource. Assumes that rank_df is ordered by the aggregated evidence
+# resource. Assumes that rows of rank_df are ordered by importance, such that
+# the first row/gene has the highest importance.
 
 get_pr <- function(rank_df) {
   
@@ -24,7 +104,7 @@ get_pr <- function(rank_df) {
   
   # convert ranks to monotonically decreasing scores representing rank importance
   scores <- 1/(1:length(labels))
-  
+
   pred <- ROCR::prediction(predictions = scores, labels = labels)
   perf <- ROCR::performance(pred, measure = "prec", x.measure = "rec")
   
@@ -47,9 +127,9 @@ get_auprc <- function(rank_df) {
   
   # convert ranks to monotonically decreasing scores representing rank importance
   scores <- 1/(1:length(labels))
-  
+
   pred <- ROCR::prediction(predictions = scores, labels = labels)
-  aupr <- performance(pred, measure = "aucpr")@y.values[[1]]
+  aupr <- ROCR::performance(pred, measure = "aucpr")@y.values[[1]]
   
   return(aupr)
 }
@@ -129,18 +209,20 @@ sample_target_auprc <- function(rank_df,
 }
 
 
-
-# Proportion of sampled AUPRCS with greater AUPRC than observed 
-
+# Returns a table of the proportion of TR-specific sampled AUPRCs in 
+# sampled_list that are greater than the observed AUPRCs in auprc_df
 
 get_all_prop <- function(auprc_df, sampled_list) {
   
-  
-  get_prop <- function(obs, vec, n) sum(obs < vec) / n
-  
+  # Inner function returns a single proportion
+  get_prop <- function(obs, vec, n) { 
+    sum(obs < vec) / n 
+  }
+
   tfs <- rownames(auprc_df)
   stopifnot(identical(rownames(auprc_df), names(sampled_list)))
   
+  # Loop through each TR, comparing the observed AUPRC with sampled
   prop_list <- lapply(tfs, function(x) {
     sampled <- unlist(sampled_list[[x]])
     n <- length(sampled)
@@ -148,41 +230,59 @@ get_all_prop <- function(auprc_df, sampled_list) {
     apply(auprc, 2, function(y) get_prop(obs = y, vec = sampled, n))
   })
   names(prop_list) <- tfs
-  
+
   return(do.call(rbind, prop_list))
 }
 
 
-
-# The following generates the AUPRC values for individual experiments and
-# their rank product pairings, returning a list that contains the values, as 
-# well as the percentile of the aggregate AUPRCs relative to the distribution
-# of individual experiment AUPRCs
-# ------------------------------------------------------------------------------
-
+# The following generates the AUPRC values for individual experiments and for 
+# the rank product between each ChIP-seq and perturbation experiment.
+# Returns a list that contains (1) these values in a df; (2) The observed
+# AUPRCs for the aggregated rankings, and (3) The percentile of the aggregate 
+# AUPRCs relative to the emprical distribution of individual experiment AUPRCs
 
 
-get_vec_auprc <- function(vec, targets) {
+# AUPRCs for each experiment in the ranked matrix
+
+experiment_auprc <- function(ids, rank_mat, targets, ncores = 1) {
   
-  # Uses the ROCR package to return the area under the precision recall curve
-  # for the ordered ranking of targets in vec
+  mclapply(ids, function(x) {
+    
+    ranking <- names(sort(rank_mat[, x], na.last = TRUE))
+    rank_df <- data.frame(Symbol = ranking, Curated_target = ranking %in% targets)
+    get_auprc(rank_df)
   
-  # positives/has curated evidence=1 negatives/no known evidence=0 
-  labels <- as.factor(as.numeric(vec %in% targets))
-  
-  # convert ranks to monotonically decreasing scores representing rank importance
-  scores <- 1/(1:length(labels))
-  
-  pred <- ROCR::prediction(predictions = scores, labels = labels)
-  aupr <- performance(pred, measure = "aucpr")@y.values[[1]]
-  return(aupr)
+  }, mc.cores = ncores)
 }
 
 
+# AUPRCs of the rank product of each paired ChIP-seq+perturb experiment
 
-# This function calculates the AUPRC of each individual experiment for the 
-# requested TF, as well as the AUPRC of each individual pairing of ChIP-seq
-# and perturbation experiments. 
+rp_auprc <- function(bind_ids, perturb_ids, bmat, pmat, targets, ncores) {
+  
+  mclapply(bind_ids, function(x) {
+    
+    lapply(perturb_ids, function(y) {
+      
+      rank_df <-
+        data.frame(Symbol = rownames(bmat),
+                   Bind = bmat[, x],
+                   Perturb = pmat[, y]) %>%
+        mutate(
+          Rank_product = (Bind / nrow(bmat)) * (Perturb / nrow(pmat)),
+          Curated_target = Symbol %in% targets
+        ) %>%
+        arrange(Rank_product)
+      
+      get_auprc(rank_df)
+      
+    })
+  }, mc.cores = ncores)
+}
+
+
+# Main function: This is called within a lapply call that loops over tfs.
+# Ranking_list is the list of TF-specific aggregated data gene rankings.
 
 all_experiment_auprc <- function(tf,
                                  chip_meta,
@@ -192,127 +292,63 @@ all_experiment_auprc <- function(tf,
                                  ranking_list,
                                  ncores = 1) {
   
+  stopifnot(identical(rownames(bind_mat), rownames(perturb_mat)))
   
-  # isolate relevant TF-specific data
+  # Isolate relevant TF-specific data
   bind_ids <- filter(chip_meta, Symbol == tf)$Experiment_ID
   perturb_ids <- filter(perturb_meta, Symbol == tf)$Experiment_ID
   targets <- filter(ranking_list[[tf]], Curated_target)$Symbol
-  perturb_mat <- perturb_mat[, perturb_ids, drop = FALSE]
-  bind_mat <- bind_mat[, bind_ids, drop = FALSE]
   
+  # Convert effect size matrices to ranks
+  perturb_rank <- apply(perturb_mat[, perturb_ids, drop = FALSE], 2, rank, ties = "min")
+  bind_rank <- apply(-bind_mat[, bind_ids, drop = FALSE], 2, rank, ties = "min")
   
-  # AUPRCs for combined/perturb/bind aggregated rankings
+  # AUPRCs for combined/perturb/bind aggregated rankings for the given TF
   all_auprcs <- get_all_auprc(ranking_list[[tf]])
   
-  
   # AUPRCs for each specific ChIP-seq experiment
-  bind_auprcs <- lapply(bind_ids, function(x) {
-    ranking <- names(sort(bind_mat[, x], decreasing = TRUE))
-    get_vec_auprc(ranking, targets)
-  })
-  
-  
+  bind_auprcs <- experiment_auprc(ids = bind_ids, 
+                                  rank_mat = bind_rank,
+                                  targets = targets, 
+                                  ncores = ncores)
+ 
   # AUPRCs for each specific perturbation experiment
-  perturb_auprcs <- lapply(perturb_ids, function(x) {
-    ranking <- names(sort(perturb_mat[, x]))
-    get_vec_auprc(ranking, targets)
-  })
+  perturb_auprcs <- experiment_auprc(ids = perturb_ids,
+                                     rank_mat = perturb_rank,
+                                     targets = targets,
+                                     ncores = ncores)
   
+  # AUPRCs of the rank product of each paired ChIP-seq+perturb experiment
+  rp_auprcs <- 
+    rp_auprc(bind_ids, perturb_ids, bind_rank, perturb_rank, targets, ncores)
   
-  # AUPRCs of the rank product of each paired experiment
-  rp_auprcs <- mclapply(perturb_ids, function(x) {
-    
-    l <- lapply(bind_ids, function(y) {
-      
-      bind_ranking <- rank(-bind_mat[, y, drop = FALSE])
-      perturb_ranking <- rank(perturb_mat[, x, drop = FALSE])
-      
-      df <- data.frame(Symbol = rownames(bind_mat),
-                       Bind = bind_ranking, 
-                       Perturb = perturb_ranking)
-      
-      df$Rank_product <- bind_ranking/nrow(df) * perturb_ranking/nrow(df)
-      
-      ranking <- arrange(df, Rank_product)$Symbol
-      
-      get_vec_auprc(ranking, targets)
-      
-    })
-  }, mc.cores = ncores)
-  
-  
-  # Make rank product into long df with experiment IDs
+  # Convert list of rank products into long df with paired experiment IDs
   rp_df <- reshape2::melt(rp_auprcs)
-  rp_df$L2 <- colnames(bind_mat)[rp_df$L2]
-  rp_df$L1 <- colnames(perturb_mat)[rp_df$L1]
-  rp_df$ID <- paste(rp_df$L2, rp_df$L1, sep = ":")
+  rp_df$L1 <- colnames(bind_rank)[rp_df$L1]
+  rp_df$L2 <- colnames(perturb_rank)[rp_df$L2]
+  rp_df$ID <- paste(rp_df$L1, rp_df$L2, sep = ":")
   
-  # Summary df
+  # Summary df of all individual AUPRCs
   auprc_df <- data.frame(
-    Group = c(rep("Bind", length(bind_auprcs)), 
+    Group = c(rep("Bind", length(bind_auprcs)),
               rep("Perturb", length(perturb_auprcs)),
               rep("Rank_product", nrow(rp_df))),
     ID = c(bind_ids, perturb_ids, rp_df$ID),
     AUPRC = c(unlist(bind_auprcs), unlist(perturb_auprcs), rp_df$value)
   )
   
-  # empirical distn of AUPRC from all experiments and get percentiles of observed aggregate
+  # Empirical distn of individual AUPRCs 
   auprc_emp <- ecdf(auprc_df$AUPRC)
   
+  # Organize the percentile of observed aggregated AUPRC to the emp. distn
   auprc_perc <- data.frame(
-    Aggregate = auprc_emp(all_auprcs$Integrated),
-    Bind = auprc_emp(all_auprcs$Binding),
-    Perturb = auprc_emp(all_auprcs$Perturbation))
+    Integrated = auprc_emp(all_auprcs$Integrated),
+    Binding = auprc_emp(all_auprcs$Binding),
+    Perturbation = auprc_emp(all_auprcs$Perturbation))
   
   return(list(
     AUPRC_df = auprc_df,
-    AUPRC_agg = all_auprcs,
+    AUPRC_aggregated = all_auprcs,
     AUPRC_percentile = auprc_perc
   ))
 }
-
-
-
-# I originally wrote these to calculate AUPR down a list, but the ROCR version
-# was faster (needed for the sampling procedure). Keeping for posterity
-# ------------------------------------------------------------------------------
-
-
-# get_pr <- function(ranking, targets) {
-#   
-#   # Ranking as a vector of ordered symbols, targets as positive labels. Returns
-#   # a dataframe of precision and recall for each element in ranking (k)
-#   
-#   pos <- as.numeric(ranking %in% targets)
-#   
-#   pr <- mclapply(1:length(pos), function(k) {
-#     
-#     tp <- sum(pos[1:k])
-#     fp <- k - tp
-#     prec <- tp / (tp + fp) # TP/(TP+FP)
-#     rec <- tp / length(targets) # TP/P
-#     
-#     if (is.na(prec)) prec <- 0
-#     if (is.na(rec)) rec <- 0
-#     
-#     data.frame(Precision = prec, Recall = rec)
-#     
-#   }, mc.cores = 8)
-#   
-#   pr <- do.call(rbind, pr)
-#   return(pr)
-# }
-
-
-
-# get_aucpr <- function(pr_df, method = "spline") {
-#   
-#   # Get the area under the precision-recall curve
-#   # https://search.r-project.org/CRAN/refmans/DescTools/html/AUC.html
-#   
-#   suppressWarnings(DescTools::AUC(
-#     x = pr_df$Recall,
-#     y = pr_df$Precision,
-#     method = method
-#   ))
-# }
