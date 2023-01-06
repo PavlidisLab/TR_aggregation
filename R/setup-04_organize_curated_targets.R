@@ -10,7 +10,6 @@ library(googlesheets4)
 
 date <- "July2022"  # last accessed July 4 2022
 gsheets_id <- "1ngjKoRGaOgF-8BlxUPK7o7XRg7wimTxYYQkSokSVYUM" # July
-# gsheets_id <- "1PB2P-9Xk2zV0RSZnkY5BdnV6E4KkDpEKvo68Sw_Rnx8" # latest
 out_all <- paste0("~/Data/Metadata/Curated_targets_all_", date, ".tsv")
 out_pavlab <- paste0("~/Data/Metadata/Curated_targets_pavlab_", date, ".tsv")
 
