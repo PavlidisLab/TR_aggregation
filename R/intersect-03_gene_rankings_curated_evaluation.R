@@ -3,9 +3,6 @@
 ## respective rankings recover curated targets.
 ## DREAM5 (PR analysis for ranking regulation): https://pubmed.ncbi.nlm.nih.gov/22796662/
 ## DREAM2: (Appendix details of PR): https://pubmed.ncbi.nlm.nih.gov/19348640/
-## TODO: finalize plotting
-## TODO: which targets are missing from each species
-## TODO: currently just human/mouse, ortho needs symbol match in sample_target_auprc
 ## -----------------------------------------------------------------------------
 
 library(tidyverse)
@@ -26,16 +23,21 @@ dat_list <- readRDS(paste0(scratch_dir, date, "_all_data_list.RDS"))
 # Curated targets
 lt_all <- read.delim(paste0(meta_dir, "Curated_targets_all_July2022.tsv"), stringsAsFactors = FALSE)
 
+# Mapping of orthologous genes
 pc_ortho <- read.delim(paste0(meta_dir, "hg_mm_1to1_ortho_genes_DIOPT-v8.tsv"), stringsAsFactors = FALSE)
 tfs_hg <- names(rank_list$Human)
 tfs_mm <- names(rank_list$Mouse)
 
+# Object that contains the topn overlapping genes between experiments
 ol_list <- readRDS(paste0(scratch_dir, date, "_intersect_similarity.RDS"))
 
-# Describe count of targets and human/mouse presence
-# TODO: human/mouse presence
+
+# Describe count of curated targets and experimental types per TR. Note: For 
+# evaluation considering genes whose evidence comes from a mouse OR human system.
 # ------------------------------------------------------------------------------
 
+
+# Only consider the current TRs
 
 lt_sub <- lt_all %>% 
   mutate(
@@ -46,27 +48,32 @@ lt_sub <- lt_all %>%
   filter(TF_Symbol %in% names(rank_list$Human)) 
 
 
-# Count by low-throughpuut table
-lt_sub %>% 
-  group_by(TF_Symbol) %>% 
-  summarise(n = n_distinct(Target_Symbol))
+# Genes found only in curated resource
+
+lt_only <- list(
+  Human = setdiff(lt_sub$Target_Symbol, rank_list$Human[[1]]$Symbol),
+  Mouse = setdiff(str_to_title(lt_sub$Target_Symbol), rank_list$Mouse[[1]]$Symbol)
+)
 
 
-# Using human rankings to get the number of curated targets
+# Using human rankings to get the number of curated targets (these #s vary
+# only slightly between using mouse or directly from the lt table)
+
 n_target <- data.frame(
   Symbol = names(rank_list$Human),
   Count = unlist(lapply(rank_list$Human, function(x) sum(x$Curated_target)))
-) %>% 
+  ) %>% 
   arrange(desc(Count))
 
+
 # How many unique targets across the TRs
+
 n_unique <- n_distinct(unlist(
   lapply(rank_list$Human, function(x) filter(x, Curated_target)$Symbol)
 ))
 
 
-# TODO: better spot for this note
-# NOTE: TF-targets can have multiplicity in evidence for the same experiment
+# TF-targets can have multiplicity in evidence for the same experiment
 # type, given that they are done in unique cell types. Eg, ASCL1-DLL1 has 7 
 # entries in human: 3x perturbation, 2x binding, 2x reporter assays, and 5
 # in mouse: 2 binding, 2 perturbation, 1 reporter. However, also note that 9/12
@@ -78,31 +85,43 @@ n_type <- lt_sub %>%
   count(Experiment_Type, TF_Symbol, name = "Count")
 
 
-exp_per_target <- lapply(split(lt_sub, lt_sub$TF_Symbol), function(x) {
-  
-  a <- count(x, Target_Symbol, Experiment_Type)
-  b <- matrix(0, nrow = n_distinct(a$Target_Symbol), ncol = 5)
-  rownames(b) <- unique(a$Target_Symbol)
-  colnames(b) <- c(unique(n_type$Experiment_Type), "Sum")
-  
-  for (i in 1:nrow(a)) {
-    b[a$Target_Symbol[i], a$Experiment_Type[i]] <- a$n[i]
-  }
-  
-  b[, "Sum"] <- rowSums(b)
-  
-  b <- b[order(b[, "Sum"], decreasing = TRUE), ]
-  
-  return(b)
-})
-names(exp_per_target) <- unique(lt_sub$TF_Symbol)
+# The following creates a list of count matrices tallying the count of experiment 
+# for each type (perturbation, binding, reporter) for each curated TR-target
 
+get_exp_counts <- function(lt_df) {
+  
+  l_split <- split(lt_df, lt_df$TF_Symbol)
+  
+  count_l <- lapply(l_split, function(x) {
+    
+    a <- count(x, Target_Symbol, Experiment_Type)
+    b <- matrix(0, nrow = n_distinct(a$Target_Symbol), ncol = 5)
+    rownames(b) <- unique(a$Target_Symbol)
+    colnames(b) <- c(unique(n_type$Experiment_Type), "Sum")
+    
+    for (i in 1:nrow(a)) {
+      b[a$Target_Symbol[i], a$Experiment_Type[i]] <- a$n[i]
+    }
+    
+    b[, "Sum"] <- rowSums(b)
+    
+    b <- b[order(b[, "Sum"], decreasing = TRUE), ]
+    
+    return(b)
+  })
+  names(count_l) <- unique(lt_df$TF_Symbol)
+  
+  return(count_l)
+}
+
+
+exp_per_target <- get_exp_counts(lt_sub)
 
 
 # Wilcoxon rank sum test for the three gene rankings by presence of curated
-# evidence. # In mouse find evidence for all rankings save for Neurod1 
-# perturbation and Tcf4 binding and integrated. In human it's a bit more spotty 
-# (no MEF2C reaches sig) but the majority of comparisons still provide evidence
+# evidence. In mouse find evidence for all rankings save for Neurod1 perturbation
+# and Tcf4 binding and integrated. In human it's a bit more spotty (no MEF2C 
+# reaches sig) but the majority of comparisons still provide evidence
 # ------------------------------------------------------------------------------
 
 
@@ -189,8 +208,8 @@ nreps = 1000
 set.seed(20)
 
 sample_target_list <- list(
-  Human = lapply(rank_list$Human, sample_target_auprc, lt_df = lt_all, reps = nreps),
-  Mouse = lapply(rank_list$Mouse, sample_target_auprc, lt_df = lt_all, reps = nreps, mouse = TRUE)
+  Human = lapply(rank_list$Human, sample_target_auprc, lt_df = lt_all, reps = nreps, ncores = cores),
+  Mouse = lapply(rank_list$Mouse, sample_target_auprc, lt_df = lt_all, reps = nreps, ncores = cores, mouse = TRUE)
 )
 
 # Proportion of samples with greater AUPRC than observed 
@@ -200,15 +219,16 @@ prop_list <- list(
   Mouse = get_all_prop(auprc_list$Mouse, sample_target_list$Mouse)
 )
 
+# Human ASCL1 no AUPRC from sampled curated targets exceeded observed of true 
+# ASCL1 curated targets. 
 
-sample_target_list$Human$ASCL1 %>% head
-prop_list$Human %>% head
+ascl1_prop <- prop_list$Human["ASCL1", ]
+
 
 # For each TR, get the AUPRC from the individual data sets composing the 
-# aggregation, as well as individual rank product pairs. Focus on ordering
-# perturbation by pvals
+# aggregation, as well as rank product pairings between individual chip-seq and
+# perturbation experiments. Focus on ordering perturbation by pvals. SLOW!
 # ------------------------------------------------------------------------------
-
 
 
 hg <- lapply(tfs_hg, function(x) {
@@ -217,7 +237,8 @@ hg <- lapply(tfs_hg, function(x) {
                        perturb_meta = dat_list$Perturbation$Meta,
                        bind_mat = dat_list$Binding$Human$QN_log,
                        perturb_mat = dat_list$Perturbation$Human$Pval_mat,
-                       ranking_list = rank_list$Human)
+                       ranking_list = rank_list$Human,
+                       ncores = cores)
 })
 names(hg) <- tfs_hg
   
@@ -229,12 +250,14 @@ mm <- lapply(tfs_mm, function(x) {
                        perturb_meta = dat_list$Perturbation$Meta,
                        bind_mat = dat_list$Binding$Mouse$QN_log,
                        perturb_mat = dat_list$Perturbation$Mouse$Pval_mat,
-                       ranking_list = rank_list$Mouse)
+                       ranking_list = rank_list$Mouse,
+                       ncores = cores)
 })
 names(mm) <- tfs_mm
   
   
-# Note for ortho just coerce casing of symbol to same to grab both
+# Note for ortho just coerce casing of symbol to same to grab both species
+
 ortho <- lapply(tfs_hg, function(x) {
   all_experiment_auprc(
     tf = x,
@@ -242,7 +265,8 @@ ortho <- lapply(tfs_hg, function(x) {
     perturb_meta = mutate(dat_list$Perturbation$Meta, Symbol = str_to_upper(Symbol)),
     bind_mat = dat_list$Binding$Ortho$QN_log,
     perturb_mat = dat_list$Perturbation$Ortho$Pval_mat,
-    ranking_list = rank_list$Ortho)
+    ranking_list = rank_list$Ortho,
+    ncores = cores)
 })
 names(ortho) <- tfs_hg
 
@@ -277,45 +301,47 @@ gt_list <- list(
 # in low-throughput. So benchmark may be biased towards individual experiments
 # of that cellular context
 
-top_runx1 <- gt_list$Human$RUNX1 %>% arrange(desc(AUPRC))
-sort(table(filter(lt_all, str_to_upper(TF_Symbol) == "RUNX1")$Cell_Type))
+runx1_top <- gt_list$Human$RUNX1 %>% arrange(desc(AUPRC))
+sort(table(filter(lt_all, str_to_upper(TF_Symbol) == "RUNX1")$Cell_Type), decreasing = TRUE)
 
-# Further, most performant mouse Neurod1 experiments tend to be pancreatic.
+
+# Most performant mouse Neurod1 experiments tend to be pancreatic.
 # Correspondingly, UBERON:0001264 (pancreas) is one of the top curated cell types
 # (although max is cochlea... also lots of NAs)
 
-top_neurod1 <- gt_list$Mouse$Neurod1 %>% arrange(desc(AUPRC))
-sort(table(filter(lt_all, str_to_upper(TF_Symbol) == "NEUROD1")$Cell_Type))
-
-# Topn 500 overlap of the highest performant Neurod1 pair
-# ol_neurod1 <- ol_list$sim_list$Mouse$Pval_Genes[[top_neurod1$ID[1]]]
-ol_neurod1 <- ol_list$sim_list$Mouse$Pval_Genes[["GSE30298_Neurod1_Mouse_Pancreatic-islets:GSE122992_Neurod1_Mouse_Overexpression"]]
-targets_neurod1 <- filter(rank_list$Mouse$Neurod1, Curated_target)$Symbol
-intersect(ol_neurod1, targets_neurod1)
+neurod1_top <- gt_list$Mouse$Neurod1 %>% arrange(desc(AUPRC))
+sort(table(filter(lt_all, str_to_upper(TF_Symbol) == "NEUROD1")$Cell_Type), decreasing = TRUE)
 
 
-# Rank product ordering of top pair
-# TODO: shorthand for rank product
+# Extract the Top 500 overlapping genes of the highest performing Neurod1 ChIP-seq
+# and perturbation pair and check which are curated targets
 
-exp_chip <- data.frame(Bind = dat_list$Binding$Mouse$QN_log[, "GSE30298_Neurod1_Mouse_Pancreatic-islets"]) %>% rownames_to_column(var = "Symbol")
-exp_perturb <- data.frame(Perturb = dat_list$Perturbation$Mouse$Pval_mat[, "GSE122992_Neurod1_Mouse_Overexpression"]) %>% rownames_to_column(var = "Symbol")
+neurod1_bind <- "GSE30298_Neurod1_Mouse_Pancreatic-islets"
+neurod1_perturb <- "GSE122992_Neurod1_Mouse_Overexpression"
+neurod1_ol <- ol_list$sim_list$Mouse$Pval_Genes[[paste(neurod1_bind, neurod1_perturb, sep = ":")]]
+neurod1_targets <- filter(rank_list$Mouse$Neurod1, Curated_target)$Symbol
+neurod1_ol_curated <- intersect(neurod1_ol, neurod1_targets)
 
-exp_df <- left_join(exp_chip, exp_perturb, by = "Symbol") %>% 
-  mutate(Bind = rank(-Bind),
-         Perturb = rank(Perturb),
-         RP = rank(Bind/nrow(exp_chip) * Perturb/nrow(exp_perturb)))
+# Get the rank product ordering of this top Neurod1 pair, and compare to the 
+# original ranking of all aggregated Neurod1 experiments. Mafa, G6pc2, Ins1, Ins2
+# example of curated targets with high rank product ranking between the top
+# experiment pair but not in the aggregated rankings. Pancreatic genes. 
 
-filter(exp_df, Symbol %in% ol_neurod1)
-filter(exp_df, Symbol %in% targets_neurod1)
+rank_bind <-
+  data.frame(Bind = rank(-dat_list$Binding$Mouse$QN_log[, neurod1_bind])) %>%
+  rownames_to_column(var = "Symbol")
 
-# Mafa, G6pc2, Ins1, Ins2 example of curated targets with high rank product
-# ranking between the top experiment pair but not in the aggregated rankings.
-# Pancreatic genes
+rank_perturb <-
+  data.frame(Perturb = rank(dat_list$Perturbation$Mouse$Pval_mat[, neurod1_perturb])) %>%
+  rownames_to_column(var = "Symbol")
 
-diff_df <- rank_list$Mouse$Neurod1 %>% 
-  filter(Curated_target) %>% 
-  left_join(exp_df, by = "Symbol")
-
+rank_rp <- 
+  left_join(rank_bind, rank_perturb, by = "Symbol") %>% 
+  mutate(RP = rank(Bind/nrow(rank_bind) * Perturb/nrow(rank_perturb))) %>% 
+  left_join(rank_list$Mouse$Neurod1[, c("Symbol", "Curated_target", "Rank_integrated")], 
+            by = "Symbol") %>% 
+  arrange(RP)
+  
 
 # Plots
 # ------------------------------------------------------------------------------
@@ -487,10 +513,10 @@ plot_sample_auprc <- function(sample_list, auprc_df, tf) {
     geom_vline(aes(xintercept = auprc_df[tf, "Integrated"], col = "Integrated"), size = 1.1, linetype = "solid") +
     geom_vline(aes(xintercept = auprc_df[tf, "Perturbation"], col = "Perturbation"), size = 1.1, linetype = "solid") +
     geom_vline(aes(xintercept = auprc_df[tf, "Binding"], col = "Binding"), size = 1.1, linetype = "solid") +
-    xlim(c(NA, max(auprc_df[tf,])*1.2)) +  # pad xlim as observed typically greater
+    xlim(c(NA, max(auprc_df[tf,] ) * 1.2)) +  # pad xlim as observed typically greater
     ylab("Count") +
     ggtitle(paste0(tf, ": Sampled targets relative to curated")) +
-    scale_colour_manual(values = rank_cols, labels = c("Integrated", "Binding", "Perturbation")) +
+    scale_colour_manual(values = rank_cols, labels = names(rank_cols)) +
     theme_classic() +
     theme(axis.text = element_text(size = 25),
           axis.title = element_text(size = 25),
@@ -500,7 +526,6 @@ plot_sample_auprc <- function(sample_list, auprc_df, tf) {
           legend.position = c(0.90, 0.90),
           plot.margin = margin(10, 20, 10, 10))
 }
-
 
 
 plist_hg3 <- lapply(tfs_hg, function(x) {
