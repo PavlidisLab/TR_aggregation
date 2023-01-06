@@ -123,7 +123,7 @@ exp <- paste(exp$Row, exp$Col, sep = ":")
 top_genes <- sim_list$Mouse$Pval_Genes[exp]
 
 # Note that two ASCL1 overexpression constructs had elevated similarity with
-# other ASCL1 experiments, as well as a few TCF
+# other ASCL1 experiments, as well as a few TCF4
 # sort(sim_list$Human$Pval_Intersect[, "GSE153823_ASCL1_Human_Overexpression"], decreasing = TRUE)
 
 
