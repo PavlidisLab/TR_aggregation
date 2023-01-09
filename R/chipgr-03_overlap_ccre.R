@@ -4,8 +4,11 @@
 library(tidyverse)
 library(GenomicRanges)
 library(cowplot)
+library(pheatmap)
+library(viridis)
 source("R/setup-01_config.R")
 source("R/utils/range_table_functions.R")
+source("R/utils/similarity_functions.R")
 
 pipeline_dir <- paste0(pipeout_dir, "chip/")
 plot_dir <- paste0(cplot_dir, "GRanges/")
@@ -296,60 +299,7 @@ group_by_tf_hg <- data.frame(group_prop_hg) %>%
   rownames_to_column(var = "Experiment_ID") %>% 
   left_join(meta[, c("Experiment_ID", "Symbol")], by = "Experiment_ID") %>% 
   group_by(Symbol) %>% 
-  summarise(across(where(is.double), list(mean)))
-
-
-# Using the ENCODE experiments targeting RUNX1 (but diff antibodies and seq
-# tech) to compare group breakdown - find quite similar
-group_prop_hg[c("GSE91747_RUNX1_Human_K562-ENCODE-Ab1", "GSE96253_RUNX1_Human_K562-ENCODE-Ab2"), ]
-
-# Using RUNX1 Kasumi-1 (most represented cell type) to show cCRE group spread
-summary(group_prop_hg[filter(meta, Symbol == "RUNX1")$Experiment_ID, ])
-group_prop_hg[filter(meta, Symbol == "RUNX1")$Experiment_ID, ]
-
-kasumi <- filter(meta, Symbol == "RUNX1" & Cell_Type == "Kasumi-1")$Experiment_ID
-non_kasumi <- filter(meta, Symbol == "RUNX1" & Cell_Type != "Kasumi-1")$Experiment_ID
-
-
-pxa <- 
-  data.frame(group_prop_hg[kasumi, ]) %>% 
-  rownames_to_column(var = "Experiment_ID") %>% 
-  reshape::melt(id = "Experiment_ID") %>% 
-  ggplot(., aes(x = variable, y = value)) +
-  geom_boxplot() +
-  ylab("Proportion of overlap") +
-  ggtitle("RUNX1 Kasumi-1 experiments") +
-  ylim(c(0, 0.6)) +
-  theme_classic() +
-  theme(axis.title.x = element_blank(),
-        axis.title.y = element_text(size = 20),
-        axis.text = element_text(size = 20),
-        axis.text.x = element_text(size = 15, angle = 90, vjust = 0.5, hjust = 1))
-
-pxb <- 
-  data.frame(group_prop_hg[non_kasumi, ]) %>% 
-  rownames_to_column(var = "Experiment_ID") %>% 
-  reshape::melt(id = "Experiment_ID") %>% 
-  ggplot(., aes(x = variable, y = value)) +
-  geom_boxplot() +
-  ylab("Proportion of overlap") +
-  ggtitle("RUNX1 non-Kasumi-1 experiments") +
-  ylim(c(0, 0.6)) +
-  theme_classic() +
-  theme(axis.title.x = element_blank(),
-        axis.title.y = element_text(size = 20),
-        axis.text = element_text(size = 20),
-        axis.text.x = element_text(size = 15, angle = 90, vjust = 0.5, hjust = 1))
-
-
-plot_grid(pxa, pxb)
-
-
-summary(group_prop_hg[filter(meta, Symbol == "RUNX1" & Cell_Type != "Kasumi-1")$Experiment_ID, ])
-boxplot(group_prop_hg[filter(meta, Symbol == "RUNX1" & Cell_Type != "Kasumi-1")$Experiment_ID, ])
-
-summary(group_prop_hg[filter(meta, Symbol == "RUNX1" & Cell_Type == "Kasumi-1")$Experiment_ID, ])
-boxplot(group_prop_hg[filter(meta, Symbol == "RUNX1" & Cell_Type == "Kasumi-1")$Experiment_ID, ])
+  dplyr::summarise(across(where(is.double), list(mean)))
 
 
 # Mouse:
@@ -365,7 +315,44 @@ group_by_tf_mm <- data.frame(group_prop_mm) %>%
   rownames_to_column(var = "Experiment_ID") %>% 
   left_join(meta[, c("Experiment_ID", "Symbol")], by = "Experiment_ID") %>% 
   group_by(Symbol) %>% 
-  summarise(across(where(is.double), list(mean)))
+  dplyr::summarise(across(where(is.double), list(mean)))
+
+
+# Looking at ccRE overlap in human Runx1 experiments: those that essentially
+# are technical reps, and in-vs-out of Kasumi-1, the most represented cell type
+# ------------------------------------------------------------------------------
+
+
+runx1 <- filter(meta, Symbol == "RUNX1")$Experiment_ID
+kasumi <- filter(meta, Symbol == "RUNX1" & Cell_Type == "Kasumi-1")$Experiment_ID
+non_kasumi <- filter(meta, Symbol == "RUNX1" & Cell_Type != "Kasumi-1")$Experiment_ID
+
+# Experiments in Kasumi-1 that are not true reps (use different Abs) but are
+# same group/cell-type/Runx1
+
+check_exp <- c(
+  "GSE45738_RUNX1_Human_C-term-Antibody",
+  "GSE45738_RUNX1_Human_N-term-Antibody",
+  "GSE65427_RUNX1_Human_Ab1",
+  "GSE65427_RUNX1_Human_Ab2"
+)
+
+# Get the proportion of peaks that overlap between experiments.
+runx1_prop_mat <- get_prop_mat(gr_hg[runx1, ], cores)
+kasumi_prop_mat <- runx1_prop_mat[kasumi, kasumi]
+non_kasumi_prop_mat <- runx1_prop_mat[non_kasumi, non_kasumi]
+
+# Median overlap higher in within Kasumi-1 group
+kasumi_prop_df <- format_pair_df(runx1_prop_mat[kasumi, kasumi], symmetric = FALSE)
+non_kasumi_prop_df <- format_pair_df(runx1_prop_mat[non_kasumi, non_kasumi], symmetric = FALSE)
+summary(kasumi_prop_df$Value)
+summary(non_kasumi_prop_df$Value)
+
+# Proportion of overlap in check experiments
+runx1_prop_mat[check_exp, check_exp]
+
+# cCRE overlap in check experiments
+group_prop_hg[check_exp, ]
 
 
 # Explore region x TF matrix and look at cCRE status of top bound regions
@@ -443,7 +430,6 @@ get_ccre_group <- function(regions, ccre_gr) {
 # (9, 38022988:38023319) where every ASCL1 experiment had a binding event, while
 # only 2 other experiments (TCF4) were bound. Correpsonds to an enhancer cCRE
 
-
 tf <- "ASCL1"
 
 # Order count matrix by regions that have most common binding in TF relative
@@ -452,7 +438,6 @@ top_mat_hg <- top_tf_count(count_list$Human$Reduced_resize, tf)$Count_mat
 
 # Regions with max binding
 top_regions_hg <- top_mat_hg[top_mat_hg[, tf] == max(top_mat_hg[, tf]), ]
-nrow(top_regions_hg)
 
 # cCRE status of these top regions
 top_ccre_hg <- get_ccre_group(rownames(top_regions_hg), ccre_hg)
@@ -461,11 +446,9 @@ top_ccre_hg <- get_ccre_group(rownames(top_regions_hg), ccre_hg)
 # Mouse - focused on Neurod1. 10:49985040-49985394 highly conserved, no ccRE
 # status. Closest gene is Gm48131
 
-
 tf <- "Neurod1"
 top_mat_mm <- top_tf_count(count_list$Mouse$Reduced_resize, tf)$Count_mat
 top_regions_mm <- top_mat_mm[top_mat_mm[, tf] == max(top_mat_mm[, tf]), ]
-nrow(top_regions_mm)
 top_ccre_mm <- get_ccre_group(rownames(top_regions_mm), ccre_mm)
 
 
@@ -507,7 +490,7 @@ get_ccre_df <- function(gr_ccre) {
   
   ccre_df <- data.frame(Group = gr_ccre$Group, stringsAsFactors = FALSE) %>% 
     group_by(Group) %>% 
-    summarize(Proportion = n()/length(gr_ccre$Group)) %>% 
+    dplyr::summarize(Proportion = n()/length(gr_ccre$Group)) %>% 
     ungroup() %>% 
     mutate(Plot_var = "1")  # Var to supply plot call
   ccre_df$Group <- factor(ccre_df$Group, levels = levels(all_ccre))
@@ -717,3 +700,64 @@ pl_mm <- plot_all_scatter(count_list$Mouse$Reduced_resize, meta_mm)
 pdf(paste0(plot_dir, date, "_mouse_freq_bound_by_ccre.pdf"))
 invisible(lapply(pl_mm, print))
 graphics.off()
+
+
+# Heatmap of the proportion of overlapping peaks between human RUNX1 experiments
+
+
+prop_heatmap <- function(mat, filename) {
+  
+  colnames(mat) <- str_replace(colnames(mat), "RUNX1_Human_", "")
+  rownames(mat) <- colnames(mat)
+  
+  pheatmap::pheatmap(mat,
+                     color = viridis::mako(11),
+                     na_col = "black",
+                     border_color = "black",
+                     cellwidth = 8,
+                     cellheight = 8,
+                     filename = filename)
+}
+
+
+prop_heatmap(runx1_prop_mat, paste0(plot_dir, "RUNX1_all_prop_overlap_heatmap.png"))
+prop_heatmap(kasumi_prop_mat, paste0(plot_dir, "RUNX1_kasumi_prop_overlap_heatmap.png"))
+prop_heatmap(non_kasumi_prop_mat, paste0(plot_dir, "RUNX1_non_kasumi_prop_overlap_heatmap.png"))
+
+
+# Boxplots of ccRE overlap for Kasumi and non-Kasumi experiments
+
+p3a <- 
+  data.frame(group_prop_hg[kasumi, ]) %>% 
+  rownames_to_column(var = "Experiment_ID") %>% 
+  reshape::melt(id = "Experiment_ID") %>% 
+  ggplot(., aes(x = variable, y = value)) +
+  geom_boxplot() +
+  ylab("Proportion of overlap") +
+  ggtitle("RUNX1 Kasumi-1 experiments") +
+  ylim(c(0, 0.6)) +
+  theme_classic() +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 20),
+        axis.text = element_text(size = 20),
+        axis.text.x = element_text(size = 15, angle = 90, vjust = 0.5, hjust = 1))
+
+p3b <- 
+  data.frame(group_prop_hg[non_kasumi, ]) %>% 
+  rownames_to_column(var = "Experiment_ID") %>% 
+  reshape::melt(id = "Experiment_ID") %>% 
+  ggplot(., aes(x = variable, y = value)) +
+  geom_boxplot() +
+  ylab("Proportion of overlap") +
+  ggtitle("RUNX1 non-Kasumi-1 experiments") +
+  ylim(c(0, 0.6)) +
+  theme_classic() +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 20),
+        axis.text = element_text(size = 20),
+        axis.text.x = element_text(size = 15, angle = 90, vjust = 0.5, hjust = 1))
+
+
+ggsave(plot_grid(p3a, p3b),
+       dpi = 300, height = 9, width = 12, device = "png", bg = "white",
+       filename = paste0(plot_dir, "RUNX1_Kasumi1_cCRE_overlap.png"))
