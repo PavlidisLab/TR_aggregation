@@ -48,7 +48,8 @@ lt_sub <- lt_all %>%
   filter(TF_Symbol %in% names(rank_list$Human)) 
 
 
-# Genes found only in curated resource
+# Genes found in curated resource but not final rankings (either filtered or
+# not included in the refseq select anno)
 
 lt_only <- list(
   Human = setdiff(lt_sub$Target_Symbol, rank_list$Human[[1]]$Symbol),
@@ -85,7 +86,7 @@ n_type <- lt_sub %>%
   count(Experiment_Type, TF_Symbol, name = "Count")
 
 
-# The following creates a list of count matrices tallying the count of experiment 
+# The following creates a list of count matrices tallying the count of experiments
 # for each type (perturbation, binding, reporter) for each curated TR-target
 
 get_exp_counts <- function(lt_df) {
@@ -393,6 +394,8 @@ ggsave(plot_grid(p1, p2), dpi = 300, device = "png", height = 12, width = 24,
 
 plot_box <- function(df, tf, wilx, tf_pal) {
   
+  # perturb box plot
+  
   perturb <- ggplot(df, aes(x = Curated_target, y = Count_DE)) +
     geom_boxplot(width = 0.3, fill = "white", outlier.shape = NA) +
     geom_jitter(data = df[df$Curated_target,],
@@ -410,6 +413,8 @@ plot_box <- function(df, tf, wilx, tf_pal) {
           plot.title = element_text(size = 20),
           plot.subtitle = element_text(size = 15))
   
+  # binding boxplot
+  
   bind <- ggplot(df, aes(x = Curated_target, y = Mean_bind)) +
     geom_boxplot(width = 0.3, fill = "white", outlier.shape = NA) +
     geom_jitter(data = df[df$Curated_target,],
@@ -425,6 +430,8 @@ plot_box <- function(df, tf, wilx, tf_pal) {
           axis.text.x = element_text(size = 25),
           plot.title = element_text(size = 20),
           plot.subtitle = element_text(size = 15))
+  
+  # combine
   
   cowplot::plot_grid(perturb, bind, nrow = 1)
   
