@@ -332,7 +332,7 @@ format_depr <- function(infile, outfile) {
     
     colnames(depr) <- str_replace(colnames(depr), "[\\.]", "_")
     colnames(depr)[colnames(depr) == "gene_Name"] <- "Symbol"
-    colnames(depr)[colnames(depr) == "deStrict_mfxRank"] <- "DE_Prior_Rank"
+    colnames(depr)[colnames(depr) == "deStrict_mfxRank"] <- "DE_prior_rank"
     
     write.table(depr,
                 sep = "\t",
