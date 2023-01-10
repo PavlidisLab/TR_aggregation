@@ -361,21 +361,21 @@ depr_heatmap <- function(tf_df,
   deprior <- deprior %>%
     filter(Symbol %in% symbols) %>%
     arrange(match(Symbol, symbols)) %>%
-    dplyr::select(DE_Prior_Rank)
+    dplyr::select(DE_prior_rank)
   
   if (deprior_binary) {
     
-    deprior$DE_Prior_Rank <- as.numeric(deprior$DE_Prior_Rank > binary_cutoff)
+    deprior$DE_prior_rank <- as.numeric(deprior$DE_prior_rank > binary_cutoff)
     pal <- c("white", "black")
     
     # incredibly hacky fix to deal with the fact that pheatmap can't handle
     # when all values are the same (why...)
-    if (all(deprior$DE_Prior_Rank == 0)) {
+    if (all(deprior$DE_prior_rank == 0)) {
       pal <- "white"
-      deprior$DE_Prior_Rank[1] <- 1
-    } else if (all(deprior$DE_Prior_Rank == 1)) {
+      deprior$DE_prior_rank[1] <- 1
+    } else if (all(deprior$DE_prior_rank == 1)) {
       pal <- "black"
-      deprior$DE_Prior_Rank[1] <- 0
+      deprior$DE_prior_rank[1] <- 0
     }
     
     legend_arg <- FALSE
@@ -385,7 +385,7 @@ depr_heatmap <- function(tf_df,
   }
   
   pheatmap(
-      deprior[, "DE_Prior_Rank", drop = FALSE],
+      deprior[, "DE_prior_rank", drop = FALSE],
       color = pal,
       cluster_rows = FALSE,
       cluster_cols = FALSE,
