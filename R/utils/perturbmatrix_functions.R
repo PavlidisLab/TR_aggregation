@@ -2,10 +2,15 @@
 ## matrix of effect sizes
 ## -----------------------------------------------------------------------------
 
+library(tidyverse)
 
 
-# Given an gene x experiment FDR mat, return a dataframe summarizing the 
-# count of times a gene was under the FDR threshold as well as the count NA
+# Given an gene x experiment FDR mat, return a dataframe summarizing DE status
+# across experiments.
+# Count_DE: Tally of gene being diff expr at FDR cutoff across experiments
+# Proportion_DE_measured: Prop. of DE across experiments with non-NAs for gene
+# Proportion_DE_all: Prop. of DE across all experiments
+# Count_NA: Tally of NA measurements for the gene across experiments
 
 count_table <- function(fdr_mat, fdr) {
   
@@ -32,6 +37,10 @@ count_table <- function(fdr_mat, fdr) {
 
 # Return a data frame that has for each gene the count of times it was down/up
 # in GoF (overexpression) and LoF (KO + KD) experiments
+# GoF_down: Tally when a gene had FC < 0 in overexpression experiments
+# GoF_up: Tally when a gene had FC > 0 in overexpression experiments
+# LoF_down: Tally when a gene had FC < 0 in KO and KD experiments
+# LoF_up: Tally when a gene had FC > 0 in KO and KD experiments
 
 tally_direction <- function(fc_mat, meta) {
   
@@ -56,19 +65,26 @@ tally_direction <- function(fc_mat, meta) {
 
 
 
+# Return a logical vector of the FC consistency across perturbation classes.
 # A gene is "consistent across" perturbation types if its predominant change
 # of direction (pos or neg FC) across experiments is opposite for gain
 # of function (overexpression) and loss of function (knockdowns, knockouts)
-# experiments. in other words, a gene is consistent if it predominantly has 
+# experiments. In other words, a gene is consistent if it predominantly has 
 # positive FC in gain of functions and predominantly negative FC in loss of
-# functions. or the other way around. it is not consistent if the predominant 
+# functions, or vice versa. It is not consistent if the predominant 
 # change of direction (positive or negative FC) is the same across both 
-# perturbation types
+# perturbation classes.
 
 is_consistent_across <- function(count_table) {
   
-  gof_class <- ifelse(count_table$GoF_down > count_table$GoF_up, "GoF_down", "GoF_up")
-  lof_class <- ifelse(count_table$LoF_down > count_table$LoF_up, "LoF_down", "LoF_up")
+  stopifnot(
+    c("GoF_down", "GoF_up", "LoF_down", "LoF_up") %in% colnames(count_table))
+  
+  gof_class <- ifelse(
+    count_table$GoF_down > count_table$GoF_up, "GoF_down", "GoF_up")
+  
+  lof_class <- ifelse(
+    count_table$LoF_down > count_table$LoF_up, "LoF_down", "LoF_up")
   
   consistent <- ifelse(
     (gof_class == "GoF_down" & lof_class == "LoF_down") |
@@ -80,7 +96,7 @@ is_consistent_across <- function(count_table) {
 }
 
 
-
+# Appends column of FC purity to a count table.
 # Treating GoF and LoF experiments as two classes, gives a measure [0,1] for
 # each gene of whether most experiments had the same up/down direction within
 # each class. Doesn't consider consistency (eg, purity can be 1 when all GoF
@@ -94,6 +110,9 @@ add_purity <- function(count_table, use_total = "all") {
   
   stopifnot(use_total %in% c("all", "gene"))
   
+  stopifnot(
+    c("GoF_down", "GoF_up", "LoF_down", "LoF_up", "Count_NA") %in% colnames(count_table))
+  
   # are genes primarily up or down regulated in each of GoF/LoF experiments
   gof_class <- ifelse(count_table$GoF_down > count_table$GoF_up, "GoF_down", "GoF_up")
   lof_class <- ifelse(count_table$LoF_down > count_table$LoF_up, "LoF_down", "LoF_up")
@@ -103,7 +122,7 @@ add_purity <- function(count_table, use_total = "all") {
     all_msrd <- which(count_table$Count_NA == 0)[1]
     total <- sum(count_table[all_msrd, c("LoF_up", "LoF_down", "GoF_up", "GoF_down")])
     
-    count_table$Purity <- vapply(1:nrow(count_table), function(x) {
+    count_table$FC_purity <- vapply(1:nrow(count_table), function(x) {
       (count_table[x, gof_class[x]] +  count_table[x, lof_class[x]]) / total
     }, FUN.VALUE = numeric(1))
     
@@ -111,7 +130,7 @@ add_purity <- function(count_table, use_total = "all") {
     
     total <- rowSums(count_table[, c("LoF_up", "LoF_down", "GoF_up", "GoF_down")])
     
-    count_table$Purity <- vapply(1:nrow(count_table), function(x) {
+    count_table$FC_purity <- vapply(1:nrow(count_table), function(x) {
       (count_table[x, gof_class[x]] +  count_table[x, lof_class[x]]) / total[x]
     }, FUN.VALUE = numeric(1))
     
@@ -126,12 +145,12 @@ add_purity <- function(count_table, use_total = "all") {
 
 add_signed_purity <- function(count_table) {
  
-  stopifnot("Purity" %in% colnames(count_table))
+  stopifnot("FC_purity" %in% colnames(count_table))
   
   consistent_across <- is_consistent_across(count_table)
   
   count_table <- count_table %>% 
-    mutate(Signed_purity = ifelse(consistent_across, Purity, -Purity))
+    mutate(FC_signed_purity = ifelse(consistent_across, FC_purity, -FC_purity))
   
   return(count_table)
 }
@@ -148,14 +167,21 @@ avg_abs_fc <- function(fc_mat) {
 
 
 # Return a dataframe that contains for each symbol:
-# 1) DE counts/fraction measured/NA counts; 
-# 2) The count of times a gene was up/down in each of GoF and LoF experiments; 
-# 3) Whether the counts were consistent in direction between LoF and GoFs;
-# 4) The GoF/LoF class purity; 
-# 5) The average absolute FC
+# Count_DE: Tally of gene being diff expr at FDR cutoff across experiments
+# Proportion_DE_measured: Prop. of DE across experiments with non-NAs for gene
+# Proportion_DE_all: Prop. of DE across all experiments
+# Count_NA: Tally of NA measurements for the gene across experiments
+# GoF_down: Tally when a gene had FC < 0 in overexpression experiments
+# GoF_up: Tally when a gene had FC > 0 in overexpression experiments
+# LoF_down: Tally when a gene had FC < 0 in KO and KD experiments
+# LoF_up: Tally when a gene had FC > 0 in KO and KD experiments
+# Avg_abs_FC: A gene's average absolute fold change across experiments
+# FC_purity: Measure of consistency of FC direction within GoF/LoF experiments
+# FC_signed_purity: FC_purity but make negative if GoF and LoF agree in direction
+# DE_prior_rank: Ranks genes by how likely they are to be DE in diverse studies
 
 process_all <- function(fdr_mat, 
-                        fdr, 
+                        fdr = 0.1, 
                         fc_mat, 
                         meta, 
                         purity_arg = "gene",
@@ -174,7 +200,7 @@ process_all <- function(fdr_mat,
     add_signed_purity()
   
   if (!is.null(de_prior)) {
-    df <- left_join(df, de_prior[, c("Symbol", "DE_Prior_Rank")], by = "Symbol")
+    df <- left_join(df, de_prior[, c("Symbol", "DE_prior_rank")], by = "Symbol")
   }
   
   return(df)
@@ -186,13 +212,13 @@ process_all <- function(fdr_mat,
 # and returns a list of a df for each symbol
 
 process_tf <- function(fdr_mat, 
-                       fdr, 
+                       fdr = 1, 
                        fc_mat, 
                        meta, 
                        use_total = "all",
                        de_prior = NULL,
                        ortho = FALSE,
-                       cores = 8) {
+                       ncores = 8) {
   
   if (ortho) meta$Symbol <- str_to_upper(meta$Symbol)
   
@@ -207,7 +233,7 @@ process_tf <- function(fdr_mat,
                 fc_mat = fc_mat[, tf_meta$Experiment_ID], 
                 meta = tf_meta,
                 de_prior = de_prior)
-  }, mc.cores = cores)
+  }, mc.cores = ncores)
   names(tf_list) <- tfs
   
   return(tf_list)
@@ -239,9 +265,11 @@ merge_ortho_counts <- function(count_ortho, count_hg, count_mm, pc_ortho) {
     
     left_join(count_ortho[[x]],
               mm[, c("Count_DE_mm", "Symbol")],
-              by = "Symbol") %>%
-      left_join(hg[, c("Count_DE_hg", "Symbol")],
-                by = "Symbol")
+              by = "Symbol"
+              ) %>%
+    left_join(hg[, c("Count_DE_hg", "Symbol")],
+              by = "Symbol")
+    
   })
   names(tf_list) <- tfs
   
