@@ -122,12 +122,17 @@ topn_ortho <- filter(rank_list$Ortho[[str_to_upper(tf)]], Rank_binding <= topn &
 get_ranks <- function(tf, gene_vec, rank_list) {
   
   gene_ranks <- lapply(gene_vec, function(x) {
+    
+    hg <- filter(rank_list$Human[[str_to_upper(tf)]], Symbol == str_to_upper(x))$Rank_integrated
+    mm <- filter(rank_list$Mouse[[str_to_title(tf)]], Symbol == str_to_title(x))$Rank_integrated
+    
     data.frame(
       Symbol = x,
-      Human = filter(rank_list$Human[[str_to_upper(tf)]], Symbol == str_to_upper(x))$Rank_integrated,
-      Mouse = filter(rank_list$Mouse[[str_to_title(tf)]], Symbol == str_to_title(x))$Rank_integrated
+      Human = ifelse(length(hg > 0), hg, NA),
+      Mouse = ifelse(length(hg > 0), mm, NA)
     )
   })
+  
   data.frame(do.call(rbind, gene_ranks))
 }
 
