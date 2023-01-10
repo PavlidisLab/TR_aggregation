@@ -36,26 +36,21 @@ meta_mm <- meta[meta$Species == "Mouse", ]
 meta_hg <- meta[meta$Species == "Human", ]
 
 
-# Functions
-# ------------------------------------------------------------------------------
-
-# Filter df for var in top quantile (qtl)
-qtl_filter <- function(df, var, qtl = 0.9) {
-  filter(df, !!sym(var) >= quantile(!!sym(var), qtl, na.rm = TRUE))
-}
-
-
-# Heuristic - remove genes in the top quantile (qtl) of count NAs
-na_filter <- function(df, qtl = 0.25) {
-  filter(df, Count_NA <= quantile(df$Count_NA, qtl))
-}
-
-
-# For all experiments and for each TF, get a data frame of 
-# 1) DE counts/proportion measured/NA counts; 
-# 2) The count of times a gene was up/down in each of GoF and LoF experiments; 
-# 3) FC purity (measure of how FC consistency across perturbation types); 
-# 5) The average absolute FC (gets used as a tie break when DE counts are tied)
+# List of data frames summarizing gene stats across perturbation experiments.
+# Generate for all experiments and split by TF experiments. 
+#
+# Count_DE: Tally of gene being diff expr at FDR cutoff across experiments
+# Proportion_DE_measured: Prop. of DE across experiments with non-NAs for gene
+# Proportion_DE_all: Prop. of DE across all experiments
+# Count_NA: Tally of NA measurements for the gene across experiments
+# GoF_down: Tally when a gene had FC < 0 in overexpression experiments
+# GoF_up: Tally when a gene had FC > 0 in overexpression experiments
+# LoF_down: Tally when a gene had FC < 0 in KO and KD experiments
+# LoF_up: Tally when a gene had FC > 0 in KO and KD experiments
+# Avg_abs_FC: A gene's average absolute fold change across experiments
+# FC_purity: Measure of consistency of FC direction within GoF/LoF experiments
+# FC_signed_purity: FC_purity but make negative if GoF and LoF agree in direction
+# DE_prior_rank: Ranks genes by how likely they are to be DE in diverse studies
 # ------------------------------------------------------------------------------
 
 
@@ -101,7 +96,8 @@ tf_de <- list(
                      ortho = TRUE)
 )
 
-# post-hoc addition of species-specific DE counts
+# Post-hoc addition of species-specific DE counts
+
 tf_de$Ortho <- merge_ortho_counts(count_ortho = tf_de$Ortho, 
                                   count_hg = tf_de$Human, 
                                   count_mm = tf_de$Mouse, 
@@ -134,12 +130,12 @@ all_na_summ <- lapply(all_de, function(x) summary(x$Count_NA))
 
 # Correlation of DE prior and DE count
 
-cor.test(all_de$Human$DE_Prior_Rank,
+cor.test(all_de$Human$DE_prior_rank,
          all_de$Human$Count_DE,
          use = "pairwise.complete.obs")
 
 
-cor.test(all_de$Mouse$DE_Prior_Rank,
+cor.test(all_de$Mouse$DE_prior_rank,
          all_de$Mouse$Count_DE,
          use = "pairwise.complete.obs")
 
@@ -157,17 +153,16 @@ max_df_mm <-
   do.call(rbind, lapply(tf_de$Mouse, function(x) filter(x, Symbol %in% de_max_mm)))
 
 
-# Inspect and provide examples of high DE count and low DE prior
-# Ie, things that are frequently DE in this collection, but not in the global
-# DE prior
+# Inspect and provide examples of high DE count and low DE prior: Genes that are
+# frequently DE in this collection, but not in the global DE prior
 
 prior_lo_hg <- all_de$Human %>%
   filter(Count_DE > 20) %>%
-  arrange(DE_Prior_Rank, desc(Count_DE))
+  arrange(DE_prior_rank, desc(Count_DE))
 
 prior_lo_mm <- all_de$Mouse %>%
   filter(Count_DE > 30) %>%
-  arrange(DE_Prior_Rank, desc(Count_DE))
+  arrange(DE_prior_rank, desc(Count_DE))
 
 
 low_hg <- c("NPEPPS", "ATE1", "AAGAB", "INPPL1")
@@ -183,7 +178,7 @@ low_mm_df <-
 
 
 # Inspect relationship of count DE and average absolute FC
-# NOTE: In general see weak cor, but in some instances (eg mouse Mecp2) see weak 
+# In general see weak cor, but in some instances (eg mouse Mecp2) see weak 
 # negative cor. Appears to be driven by genes that are mostly NA (so will have
 # low DE counts regardless) and high FC in the limited studies they are msrd.
 # ------------------------------------------------------------------------------
@@ -199,76 +194,101 @@ lapply(tf_de$Mouse, function(x) cor.test(x$Count_DE, x$Avg_abs_FC))
 
 
 # Genes with high average absolute FC and high DE count
+# ------------------------------------------------------------------------------
+
+
+# Filter df for var in top quantile (qtl)
+
+qtl_filter <- function(df, var, qtl = 0.9) {
+  filter(df, !!sym(var) >= quantile(!!sym(var), qtl, na.rm = TRUE))
+}
+
+
+# Heuristic - remove genes in the top quantile (qtl) of count NAs
+
+na_filter <- function(df, qtl = 0.25) {
+  filter(df, Count_NA <= quantile(df$Count_NA, qtl))
+}
+
+
 fc_hi_hg <- lapply(tf_de$Human, function(x) {
   qtl_filter(x, var = "Count_DE") %>% qtl_filter(var = "Avg_abs_FC")
 })
+
 
 fc_hi_mm <- lapply(tf_de$Mouse, function(x) {
   qtl_filter(x, var = "Count_DE") %>% qtl_filter(var = "Avg_abs_FC")
 })
 
 
-# NOTE: High FC and high DE count tend to have extremely high DE prior. Example
+# High FC and high DE count tend to have extremely high DE prior. Example
 # of low is MEF2C-CLBA1 (DEPR = 0.09, DE 2/4).
-lapply(fc_hi_hg, function(x) summary(x$DE_Prior_Rank))
-lapply(fc_hi_mm, function(x) summary(x$DE_Prior_Rank))
-filter(fc_hi_hg$MEF2C, DE_Prior_Rank == min(DE_Prior_Rank, na.rm = TRUE))
+
+lapply(fc_hi_hg, function(x) summary(x$DE_prior_rank))
+lapply(fc_hi_mm, function(x) summary(x$DE_prior_rank))
+filter(fc_hi_hg$MEF2C, DE_prior_rank == min(DE_prior_rank, na.rm = TRUE))
 
 
 # Examples of genes with high abs FC and low/no DE count across exps - largely
 # genes with many NAs
+
 tf_de$Mouse$Runx1 %>% 
   arrange(desc(Avg_abs_FC), Count_DE) %>% 
   head(10)
 
 
-# Inspect purity
+# Inspect FC purity
 # ------------------------------------------------------------------------------
 
 
-# Genes with high purity (GoF/LoF gives same FC direction). Remove genes with
-# frequent NAs
-
+# Genes with high purity (GoF/LoF gives same FC direction) and elevated DE 
+# counts. Remove genes with frequent NAs.
 
 pur_hi_hg <- lapply(tf_de$Human, function(x) {
   na_filter(x) %>% 
-  qtl_filter(var = "Purity") %>%
+  qtl_filter(var = "FC_purity") %>%
   arrange(desc(Avg_abs_FC))
 })
-
 
 pur_hi_mm <- lapply(tf_de$Mouse, function(x) {
   na_filter(x) %>% 
-  qtl_filter(var = "Purity") %>%
+  qtl_filter(var = "FC_purity") %>%
   arrange(desc(Avg_abs_FC))
 })
 
+# ASCL1-CABP7: DE in 6/8 experiments with a Signed purity == 1
 
-# Inspect genes with high DE count and low purity
-# NOTE: RUNX1-TFPI example of high DE count (16/32 exps), avg_avs_FC (0.88), 
-# DEPR (0.98), and low purity (0.55). Similar for Mecp2-Plxdc1 (altho lower FC)
+filter(pur_hi_hg$ASCL1, Symbol == "CABP7")
+
+
+# Genes with high DE count and low purity
 
 pur_lo_hg <- lapply(tf_de$Human, function(x) {
-  filter(x, Purity < 0.6) %>% qtl_filter(var = "Count_DE")
+  filter(x, FC_purity < 0.6) %>% qtl_filter(var = "Count_DE")
 })
 
 pur_lo_mm <- lapply(tf_de$Mouse, function(x) {
-  filter(x, Purity < 0.6) %>% qtl_filter(var = "Count_DE")
+  filter(x, FC_purity < 0.6) %>% qtl_filter(var = "Count_DE")
 })
+
+# RUNX1-TFPI example of high DE count (16/32 exps), avg_avs_FC (0.88), 
+# DEPR (0.98), and low purity (0.55). Similar for Mecp2-Plxdc1 (altho lower FC)
 
 filter(pur_lo_hg$RUNX1, Symbol == "TFPI")
 filter(pur_lo_mm$Mecp2, Symbol == "Plxdc1")
 
 
 # Correlation of DE counts and purity - filter genes with abundant NAs
-# Min cor is Human PAX6  and max is Mouse Mecp2
 
 cor_de_purity <- unlist(lapply(tf_de, function(species) {
   lapply(species, function(df) {
     df <- na_filter(df)
-    cor(df$Count_DE, df$Purity, use = "pairwise.complete.obs")
+    cor(df$Count_DE, df$FC_purity, use = "pairwise.complete.obs")
   })
 }))
+
+
+# Min cor is Human PAX6 and max is Mouse Mecp2
 
 cor_de_purity[which.min(abs(cor_de_purity))]
 cor_de_purity[which.max(abs(cor_de_purity))]
@@ -285,14 +305,14 @@ filter(tf_de$Mouse$Neurod1, Symbol == "Sft2d1")
 
 pur_summ_hg <- lapply(tf_de$Human, function(x) {
   filter(x, Count_DE > 2) %>% 
-    pull(Purity) %>% 
+    pull(FC_purity) %>% 
     summary()
 })
 
 
 pur_summ_mm <- lapply(tf_de$Mouse, function(x) {
   filter(x, Count_DE > 2) %>% 
-    pull(Purity) %>% 
+    pull(FC_purity) %>% 
     summary()
 })
 
@@ -309,7 +329,7 @@ context_df <- data.frame(
   arrange(desc(abs(Diff)))
 
 cor(context_df$Exp1, context_df$Exp2, use = "pairwise.complete.obs")
-plot(context_df$Exp1, context_df$Exp2)
+# plot(context_df$Exp1, context_df$Exp2)
 
 
 # Save out
@@ -390,8 +410,8 @@ ggsave(p1, height = 14, width = 20, dpi = 300, device = "png",
 
 de_scatter <- function(all_df, fdr, title) {
   
-  filter(all_df, !is.na(DE_Prior_Rank)) %>% 
-    ggplot(., aes(x = Count_DE, y = DE_Prior_Rank)) +
+  filter(all_df, !is.na(DE_prior_rank)) %>% 
+    ggplot(., aes(x = Count_DE, y = DE_prior_rank)) +
     geom_bin2d(bins = max(all_df$Count_DE + 1)) +
     geom_smooth(method = "lm", col = "black", se = FALSE) + 
     theme_classic() +
@@ -443,13 +463,13 @@ top_genes <- all_de$Human %>%
 p4a <- all_de$Human %>% 
   mutate(Top_count = Symbol %in% top_genes) %>% 
   ggplot() +
-  geom_point(aes(x = Count_DE, y = DE_Prior_Rank), 
+  geom_point(aes(x = Count_DE, y = DE_prior_rank), 
              data = . %>% filter(Top_count),
              fill = "blue", size = 3.5, shape = 21) +
-  geom_jitter(aes(x = Count_DE, y = DE_Prior_Rank), 
+  geom_jitter(aes(x = Count_DE, y = DE_prior_rank), 
               data = . %>% filter(!Top_count),
               shape = 21, size = 1, alpha = 0.4, width = 0.1, height = 0.1) +
-  geom_text_repel(aes(x = Count_DE, y = DE_Prior_Rank, label = Symbol),
+  geom_text_repel(aes(x = Count_DE, y = DE_prior_rank, label = Symbol),
                   data = . %>% filter(Top_count),
                   force = 0.5, force_pull = 0.5, size = 5) +
   theme_classic() +
@@ -567,7 +587,7 @@ purity_de_bplot <- function(tf_list,
     plot_df <- tf_list[[x]] %>% 
       filter(Count_NA <= na_filter)
     
-    ggplot(plot_df, aes(x = as.factor(Count_DE), y = Purity)) +
+    ggplot(plot_df, aes(x = as.factor(Count_DE), y = FC_purity)) +
       geom_rect(xmin = 0, 
                 xmax = Inf, 
                 ymin = 0, 
