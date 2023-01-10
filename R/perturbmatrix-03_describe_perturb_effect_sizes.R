@@ -17,7 +17,7 @@ fc <- 1
 
 plot_dir <- paste0(pplot_dir, "Effect_size/")
 
-# Load meta and list of results +/- processing
+# Load meta and list of DE result sets +/- filtering
 meta <- read.delim(file =  paste0(meta_dir, "batch1_tfperturb_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
 results <- readRDS(paste0(expr_dir, "TF_perturb_batch1_rslist_", date, ".RDS"))
 results_unfilt <-  readRDS(paste0(expr_dir, "TF_perturb_batch1_unfiltered_rslist_", date, ".RDS"))
@@ -25,8 +25,9 @@ results_unfilt <-  readRDS(paste0(expr_dir, "TF_perturb_batch1_unfiltered_rslist
 stopifnot(identical(names(results), meta$Experiment_ID))
 
 
-# Extract the rows corresponding to the perturbed TF of interest. Also consider
-# the unfiltered results to check multi mapped probes
+# Extract from the result sets the rows corresponding to the perturbed TF of 
+# interest. Also consider the unfiltered results to see if there are multiple 
+# mapped elements to the TF in divergent directions
 # ------------------------------------------------------------------------------
 
 
@@ -34,6 +35,7 @@ stopifnot(identical(names(results), meta$Experiment_ID))
 blank_result <- results[[1]][1, ]
 blank_result[1,] <- NA
 
+# Isolate stats for the perturbed TF from the filtered result sets
 
 pert_list <- lapply(1:length(results), function(x) {
   df <- filter_symbol(results[[x]], meta$Symbol[x])
@@ -45,6 +47,8 @@ pert_list <- lapply(1:length(results), function(x) {
 names(pert_list) <- names(results)
 
 
+# Ditto but for the unfiltered results
+
 pert_list_unfilt <- lapply(1:length(results_unfilt), function(x) {
   filter_symbol(results_unfilt[[x]], meta$Symbol[x])
 })
@@ -52,22 +56,26 @@ names(pert_list) <- names(results)
 
 
 # Look at unfiltered results to find if multiple probes match to TF
-which_multi <- which(sapply(pert_list_unfilt, function(x) (nrow(x) > 1)))
+which_multi <- unlist(lapply(pert_list_unfilt, function(x) (nrow(x) > 1)))
 which_multi_accession <- meta[which_multi, c("GSE", "Symbol", "Experiment_ID", "Platform")]
 
 # which experiments do not have any data for the TF of interest
-which_none <- which(sapply(pert_list, function(x) is.na(x$FoldChange)))
+which_none <- unlist(lapply(pert_list, function(x) is.na(x$FoldChange)))
 which_none_accession <- meta[which_none, c("GSE", "Symbol", "Experiment_ID", "Platform")]
 
 
-# inspect the experiments with no associated probes
+# Inspect the experiments with no associated elements using unfiltered results
+# and fuzzy string matching to see if elements are mapped to multiple genes
 # ------------------------------------------------------------------------------
 
 
 # GSE64264 has no probes mapping to PAX6
+
 filter_symbol(results_unfilt$GSE64264_PAX6_Human_Knockdown, "PAX6", exact = FALSE)
 
-# GSE79598 has an ambiguously mapped probe to RUNX1. Coerce to RUNX1
+# GSE79598 has an ambiguously mapped probe to RUNX1 (this was found by manually
+# searching the associated platform  on Gemma). Coerce to RUNX1
+
 pert_list$GSE79598_RUNX1_Human_Knockdown <- 
   filter(results_unfilt$GSE79598_RUNX1_Human_Knockdown, Element_Name == "TC21000423.hg.1") %>% 
   mutate(Symbol = "RUNX1", Adj_pval = as.numeric(NA), PercRankFC = as.numeric(NA))
@@ -78,15 +86,17 @@ pert_list$`GSE79598_RUNX1_Human_Knockdown-1` <-
 
 # GSE54295 has an ambiguously mapped probe, but ENSEMBL lumps to RUNX1. Going
 # to keep this multi mapped probe and coerce name to just RUNX1
+
 pert_list$GSE54295_RUNX1_Human_Mutant <- 
   filter(results_unfilt$GSE54295_RUNX1_Human_Mutant, Element_Name == "16925365") %>% 
   mutate(Symbol = "RUNX1", Adj_pval = as.numeric(NA), PercRankFC = as.numeric(NA))
 
 # GSE151385 no match to RUNX1 - knockdown resulted in gene being filtered?
+
 filter_symbol(results_unfilt$GSE151385_RUNX1_Human_Knockdown, "RUNX1", exact = FALSE)
 
-
-pert_list <- lapply(pert_list, as.data.frame)  # consistent str for binding
+# Consistency for downstream binding
+pert_list <- lapply(pert_list, as.data.frame)  
 
 
 # Constructing a summary data frame of the effect sizes of each perturbation.
@@ -103,11 +113,11 @@ pert_df <- data.frame(
 
 pert_df$Count_DEG <- vapply(results, function(x) {
   sum(x$Adj_pval < fdr)
-  }, FUN.VALUE = double(1))
+}, FUN.VALUE = double(1))
 
 pert_df$Count_DEG_FC <- vapply(results, function(x) {
   sum(x$Adj_pval < fdr & abs(x$FoldChange) > fc)
-  }, FUN.VALUE = double(1))
+}, FUN.VALUE = double(1))
 
 
 # summary of DEGs
@@ -152,7 +162,7 @@ write.table(
 # Returns a 1x5 df that summarizes the probe values for perturbed TFs that are
 # not in the expected direction of change. This is fed into an lapply call and 
 # assumes that meta_df is a 1 row slice that corresponds to the supplied 
-# resultset table
+# result set table
 
 summarize_multi_probes <- function(meta_df, resultset) {
   
@@ -183,27 +193,25 @@ which_unexpected <- which(
 )
 
 # Isolate unexpected experiments in summary df and unfiltered results list
+
 unexpected_df <- pert_df[which_unexpected, c("Experiment_ID", "FoldChange", "PercRankFC")]
 pert_list_unexpected <- pert_list_unfilt[which_unexpected]
 names(pert_list_unexpected) <- names(results)[which_unexpected]
 
 # Isolate those with multiple probes and summarize their direction/mean FC
+
 which_multi_unexpected <- intersect(which_multi, which_unexpected)
 
 multi_unexpected <- lapply(which_multi_unexpected, function(x) {
   summarize_multi_probes(meta[x, ], pert_list_unfilt[[x]])
 })
-multi_unexpected_df <- do.call(rbind, multi_unexpected)
 
+multi_unexpected_df <- do.call(rbind, multi_unexpected)
 
 # look at the percentile rank fold change of the perturbed TF - if unexpected
 # in direction, is it still highly ranked?
 
-summary(unexpected_df$PercRankFC)  # median 0.81
-
-# Which experiments have an appreciably perturbed TF that is still not at the 
-# top rankings of DEGs. 
-pert_df[which(pert_df$PercRankFC < 0.8 & abs(pert_df$FoldChange) >= 1), ]
+summary(unexpected_df$PercRankFC)  # median 0.84
 
 
 # save out meta of unexpected for curation/inspection
@@ -221,20 +229,26 @@ pert_df[which(pert_df$PercRankFC < 0.8 & abs(pert_df$FoldChange) >= 1), ]
 # )
 
 
-# Summary of fold changes across experiments
+# Get a df of fold changes for each experiment for plotting
 # -----------------------------------------------------------------------------
 
 
-fc_df <- lapply(1:length(results), function(x) {
+get_fc_df <- function(results_list, meta) {
   
-  data.frame(
-    FoldChange = results[[x]][, "FoldChange"],
-    Experiment_ID = meta$Experiment_ID[x],
-    Symbol = str_to_upper(meta$Symbol[x])
-  )
-})
+  fc_l <- lapply(1:length(results_list), function(x) {
+    
+    data.frame(
+      FoldChange = results_list[[x]][, "FoldChange"],
+      Experiment_ID = meta$Experiment_ID[x],
+      Symbol = str_to_upper(meta$Symbol[x])
+    )
+  })
+  
+  return(do.call(rbind, fc_l))
+}
 
-fc_df <- do.call(rbind, fc_df)
+
+fc_df <- get_fc_df(results, meta)
 
 
 # Correlations of perturb effect size ~ count DEGs
@@ -247,34 +261,38 @@ cor.test(pert_df_nona$PercRankFC, pert_df_nona$Count_DEG, method = "spearman")
 
 # fold change +/- abs
 cor.test(pert_df_nona$FoldChange, pert_df_nona$Count_DEG, method = "spearman")
-cor.test(abs(pert_df_nona$FoldChange), pert_df_nona$Count_DEG)
+cor.test(abs(pert_df_nona$FoldChange), pert_df_nona$Count_DEG, method = "spearman")
 
 # require count DEG > 0
 
 # abs fold change - all
 cor.test(
   abs(pert_df_nona[pert_df_nona$Count_DEG > 0, "FoldChange"]),
-  pert_df_nona[pert_df_nona$Count_DEG > 0, "Count_DEG"]
+  pert_df_nona[pert_df_nona$Count_DEG > 0, "Count_DEG"],
+  method = "spearman"
 )
 
 # abs fold change - exclude mutants
 cor.test(
   abs(pert_df_nona[pert_df_nona$Count_DEG > 0 & pert_df_nona$Perturbation != "Mutant", "FoldChange"]),
-  pert_df_nona[pert_df_nona$Count_DEG > 0 & pert_df_nona$Perturbation != "Mutant", "Count_DEG"]
+  pert_df_nona[pert_df_nona$Count_DEG > 0 & pert_df_nona$Perturbation != "Mutant", "Count_DEG"],
+  method = "spearman"
 )
 
-# require at least log2FC >= 1 for the perturbed TF and exclude mutation
+# require at least log2FC >= 1 for the perturbed TF and exclude mutants
 
 # percentile rank fold change
 cor.test(
   pert_df_nona[abs(pert_df_nona$FoldChange) > 1 & pert_df_nona$Perturbation != "Mutant", "PercRankFC"],
-  pert_df_nona[abs(pert_df_nona$FoldChange) > 1 & pert_df_nona$Perturbation != "Mutant", "Count_DEG"]
+  pert_df_nona[abs(pert_df_nona$FoldChange) > 1 & pert_df_nona$Perturbation != "Mutant", "Count_DEG"],
+  method = "spearman"
 )
 
 # fold change
 cor.test(
   abs(pert_df_nona[abs(pert_df_nona$FoldChange) > 1 & pert_df_nona$Perturbation != "Mutant", "FoldChange"]),
-  pert_df_nona[abs(pert_df_nona$FoldChange) > 1 & pert_df_nona$Perturbation != "Mutant", "Count_DEG"]
+  pert_df_nona[abs(pert_df_nona$FoldChange) > 1 & pert_df_nona$Perturbation != "Mutant", "Count_DEG"],
+  method = "spearman"
 )
 
 
@@ -284,9 +302,8 @@ cor.test(
 
 # remove NAs and collapse mouse and human symbols
 
-plot_df <- pert_df %>% mutate(Symbol = str_to_upper(Symbol))
-
-plot_df_nona <- plot_df %>% filter(!is.na(FoldChange))
+plot_df <-  mutate(pert_df, Symbol = str_to_upper(Symbol))
+plot_df_nona <- filter(plot_df, !is.na(FoldChange))
 
 species_shape <- c("Human" = 21, "Mouse" = 24)
 
@@ -514,7 +531,7 @@ ggsave(p6b, height = 6, width = 12, dpi = 300, device = "png",
        filename = paste0(plot_dir, "DEG_counts_boxplot_nolegend_", date, ".png"))
 
 
-# boxplot of DEs by perturbation type
+# boxplot of count of DEGs by perturbation type
 
 p7a <- pert_df %>% 
   ggplot(., aes(x = Perturbation, y = log10(Count_DEG + 1))) +
