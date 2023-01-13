@@ -8,7 +8,6 @@
 packages <- c(
   "tidyverse",
   "BiocManager",
-  "biomaRt",
   "parallel",
   "pheatmap",
   "DescTools",
@@ -17,14 +16,9 @@ packages <- c(
   "googlesheets4",
   "RCurl",
   "rjson",
-  "preprocessCore",
   "scales",
   "Matrix",
-  "GenomicRanges",
   "WGCNA",
-  "limma",
-  "edgeR",
-  "GeneOverlap",
   "VennDiagram",
   "egg",
   "viridis",
@@ -40,10 +34,23 @@ packages <- c(
 
 installed_packages <- packages %in% rownames(installed.packages())
 
+
 if (any(installed_packages == FALSE)) {
   install.packages(packages[!installed_packages])
 }
 
+
+if (!require("BiocManager", quietly = TRUE)) {
+  install.packages("BiocManager")
+}
+
+
+BiocManager::install("biomaRt")
+BiocManager::install("preprocessCore")
+BiocManager::install("GenomicRanges")
+BiocManager::install("limma")
+BiocManager::install("edgeR")
+BiocManager::install("GeneOverlap")
 
 
 # Trackplot + bwtools
