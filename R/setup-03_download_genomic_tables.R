@@ -3,34 +3,14 @@
 ## 2) List of TFs from Animal TF DB 
 ## 3) DIOPT 1:1 orthologous genes between mouse and human [NOTE: Pavlab server only]
 ## 4) ENCODE blacklisted regions (for filtering ChIP-seq peaks)
-## 5) ENCODE candidate cis-reg element (cCREs)
+## 5) ENCODE candidate cis-reg elements (cCREs)
 ## 6) DE prior ranking [NOTE: Pavlab server only]
+## 7) Literature curated targets from Chu 2021
 ## -----------------------------------------------------------------------------
 
 library(tidyverse)
 library(biomaRt)
-
-# Out files
-
-ref_hg <- "~/Data/Metadata/refseq_select_hg38.tsv"
-ens_hg <- "~/Data/Metadata/ensembl_human_protein_coding_V98.tsv"
-ref_mm <- "~/Data/Metadata/refseq_select_mm10.tsv"
-ens_mm <- "~/Data/Metadata/ensembl_mouse_protein_coding_V98.tsv"
-
-tf_hg <- "~/Data/Metadata/human_tfs.tsv"
-tf_mm <- "~/Data/Metadata/mouse_tfs.tsv"
-
-ortho <- "~/Data/Metadata/hg_mm_1to1_ortho_genes_DIOPT-v8.tsv"
-
-bl_hg <- "~/Data/Chromosome_info/blacklist_hg38.tsv"
-bl_mm <- "~/Data/Chromosome_info/blacklist_mm10.tsv"
-
-ccre_hg <- "~/Data/Chromosome_info/cCREs_V3_hg38.bed"
-ccre_mm <- "~/Data/Chromosome_info/cCREs_V3_mm10.bed"
-
-depr_out_hg <- "~/Data/Metadata/DE_prior_hg.tsv"
-depr_out_mm <- "~/Data/Metadata/DE_prior_mm.tsv"
-depr_out_pnas <- "~/Data/Metadata/DE_prior_PNAS.tsv"
+source("R/setup-01_config.R")
 
 
 # 1) Protein coding tables
@@ -46,7 +26,7 @@ download_refseq <- function(outfile,
   
   if (file.exists(outfile)) return(message(outfile, " already exists!"))
   
-  if(species == "Mouse") {
+  if (species == "Mouse") {
     link <- "http://hgdownload.soe.ucsc.edu/goldenPath/mm10/database/ncbiRefSeqSelect.txt.gz"
     chr <- c(1:19, "MT", "X", "Y")
   } else if (species == "Human") {
@@ -92,7 +72,7 @@ download_ensembl_pcoding <- function(outfile,
   
   if (file.exists(outfile)) return(message(outfile, " already exists!"))
   
-  if(species == "Mouse") {
+  if (species == "Mouse") {
     symbol = "mgi_symbol"
     species_data = "mmusculus_gene_ensembl"
     chr_filter <- c(1:19, "MT", "X", "Y")
@@ -120,7 +100,7 @@ download_ensembl_pcoding <- function(outfile,
   
   anno_table <- getBM(
     attributes = attributes,
-    filter = "chromosome_name",
+    filters = "chromosome_name",
     values = chr_filter,
     mart = ens_mart,
     useCache = FALSE
@@ -153,11 +133,12 @@ download_ensembl_pcoding <- function(outfile,
 }
 
 
-download_refseq(outfile = ref_hg, species = "Human")
-download_refseq(outfile = ref_mm, species = "Mouse")
+download_refseq(outfile = ref_path_hg, species = "Human")
+download_refseq(outfile = ref_path_mm, species = "Mouse")
 
-download_ensembl_pcoding(outfile = ens_hg, species = "Human")
-download_ensembl_pcoding(outfile = ens_mm, species = "Mouse")
+# Getting time out issues - not using in final analysis so commented out for now
+# download_ensembl_pcoding(outfile = ens_path_hg, species = "Human")
+# download_ensembl_pcoding(outfile = ens_path_mm, species = "Mouse")
 
 
 # 2) List of TFs http://bioinfo.life.hust.edu.cn/AnimalTFDB/
@@ -168,30 +149,29 @@ tf_url_hg <- "http://bioinfo.life.hust.edu.cn/static/AnimalTFDB3/download/Homo_s
 tf_url_mm <- "http://bioinfo.life.hust.edu.cn/static/AnimalTFDB3/download/Mus_musculus_TF"
 
 
-if (!file.exists(tf_hg)) {
-  download.file(url = tf_url_hg, destfile = tf_hg)
+if (!file.exists(tf_path_hg)) {
+  download.file(url = tf_url_hg, destfile = tf_path_hg)
 }
 
 
-if (!file.exists(tf_mm)) {
-  download.file(url = tf_url_mm, destfile = tf_mm)
+if (!file.exists(tf_path_mm)) {
+  download.file(url = tf_url_mm, destfile = tf_path_mm)
 }
 
 
-# 3) Filter/organize high-confidence 1:1 orthologs between mouse and human
+# 3) Filter/organize high-confidence 1:1 orthologs between mouse and human.
 # https://www.flyrnai.org/diopt
+# Note that this was a provided data dump that lives on Pavlab servers.
 # Recommended heuristic (passed on by Sanja): keep scores >= 5, require mutual 
 # bestscore, and remove symbols with more than one match
 # ------------------------------------------------------------------------------
 
 
-# Raw DIOPT table for filtering mouse/human orthologs. Note that this was a 
-# provided data dump on Pavlab servers
-diopt <- read.delim("/space/grp/DIOPT/DIOPTvs8_export_Sanja Rogic.txt", stringsAsFactors = FALSE)
+diopt <- read.delim(diopt_path, stringsAsFactors = FALSE)
 
 # Protein coding genes
-pc_hg <- read.delim(ref_hg, stringsAsFactors = FALSE)
-pc_mm <- read.delim(ref_mm, stringsAsFactors = FALSE)
+pc_hg <- read.delim(ref_path_hg, stringsAsFactors = FALSE)
+pc_mm <- read.delim(ref_path_mm, stringsAsFactors = FALSE)
 
 symbol_hg <- unique(pc_hg$Symbol)
 symbol_mm <- unique(pc_mm$Symbol)
@@ -231,11 +211,11 @@ symbols <- data.frame(
 stopifnot(identical(n_distinct(symbols$ID), nrow(symbols)))
 
 
-if (!file.exists(ortho)) {
+if (!file.exists(ortho_path)) {
   write.table(symbols,
               sep = "\t",
               quote = FALSE,
-              file = ortho)
+              file = ortho_path)
 }
 
 
@@ -270,8 +250,8 @@ download_blacklist <- function(outfile, url, chr) {
 }
 
 
-download_blacklist(bl_hg, bl_url_hg, chr_hg)
-download_blacklist(bl_mm, bl_url_mm, chr_mm)
+download_blacklist(bl_path_hg, bl_url_hg, chr_hg)
+download_blacklist(bl_path_mm, bl_url_mm, chr_mm)
 
 
 
@@ -307,21 +287,15 @@ download_ccre <- function(outfile, url, chr) {
 }
 
 
-download_ccre(ccre_hg, ccre_url_hg, chr_hg)
-download_ccre(ccre_mm, ccre_url_mm, chr_mm)
-
+download_ccre(ccre_path_hg, ccre_url_hg, chr_hg)
+download_ccre(ccre_path_mm, ccre_url_mm, chr_mm)
 
 
 # 6) DE prior ranking (likelihood of being measured as DE across studies)
-# Original PNAS version human only) and Nathaniel updated/expanded version
-# https://doi.org/10.1073/pnas.1802973116
+# Original PNAS version human only: https://doi.org/10.1073/pnas.1802973116
+# Nathaniel updated/expanded version: unpublished at time of writing, but using 
+# same algo. as in PNAS paper but more and diverse platforms
 # ------------------------------------------------------------------------------
-
-
-# Unpublished at time of writing, but using same algo. as in PNAS paper but more
-# and diverse platforms
-depr_in_hg <- "/home/nlim/MDE/RScripts/Chapter_4/SPACE_RDATA/Analysis/human/Final/Rare_Prior.RDS"
-depr_in_mm <- "/home/nlim/MDE/RScripts/Chapter_4/SPACE_RDATA/Analysis/mouse/Final/Rare_Prior.RDS"
 
 
 format_depr <- function(infile, outfile) {
@@ -330,9 +304,10 @@ format_depr <- function(infile, outfile) {
     
     depr <- readRDS(infile)
     
-    colnames(depr) <- str_replace(colnames(depr), "[\\.]", "_")
-    colnames(depr)[colnames(depr) == "gene_Name"] <- "Symbol"
-    colnames(depr)[colnames(depr) == "deStrict_mfxRank"] <- "DE_prior_rank"
+    depr <- depr %>%
+      dplyr::rename(Symbol = gene.Name,
+                    DE_prior_rank = deStrict.mfxRank) %>%
+      dplyr::select(Symbol, DE_prior_rank)
     
     write.table(depr,
                 sep = "\t",
@@ -343,25 +318,28 @@ format_depr <- function(infile, outfile) {
 }
 
 
-format_depr(depr_in_hg, depr_out_hg)
-format_depr(depr_in_mm, depr_out_mm)
+format_depr(depr_in_hg, depr_path_hg)
+format_depr(depr_in_mm, depr_path_mm)
 
 
+# Curated TR-tarters from Chu 2021. Records refers to experiments curated in
+# the paper and includes additional information relative to all, which aggregates
+# data from other curated resources like TRRUST.
+# https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1009484
+# ------------------------------------------------------------------------------
 
-# Human from PNAS paper
-# NOTE: Now gives 503 error on download request. Website works fine
-depr_url <- "https://www.pnas.org/doi/suppl/10.1073/pnas.1802973116/suppl_file/pnas.1802973116.sd02.txt"
+# S3: Experiments curated in study
+chu2021_url_records <- "https://doi.org/10.1371/journal.pcbi.1009484.s025"
+
+# S8: All records including external
+chu2021_url_all <-  "https://doi.org/10.1371/journal.pcbi.1009484.s030"
 
 
-# if (!file.exists(depr_out_pnas)) {
-#   
-#   download.file(depr_url, destfile = depr_out_pnas)
-#   table <- read.delim(depr_out_pnas, stringsAsFactors = FALSE)
-#   colnames(table)[colnames(table) == "Gene_Name"] <- "Symbol"
-#   
-#   write.table(table,
-#               sep = "\t",
-#               quote = FALSE,
-#               row.names = FALSE,
-#               outfile_hg_pnas)
-# }
+if (!file.exists(chu2021_path_records)) {
+  download.file(chu2021_url_records, destfile = chu2021_path_records)
+}
+
+
+if (!file.exists(chu2021_path_all)) {
+  download.file(chu2021_url_all, destfile = chu2021_path_all)
+}
