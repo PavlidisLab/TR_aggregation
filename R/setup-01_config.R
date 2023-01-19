@@ -57,10 +57,12 @@ diopt_path <- "/space/grp/DIOPT/DIOPTvs8_export_Sanja Rogic.txt"
 # Perturbation metadata
 gsheets_perturb <- "1oXo1jfoPYcX94bq2F6Bqm1Es1glc8g9mnJvYAO37Vw4"
 
-
 # ChIP-seq metadata
 gsheets_chip <- "1rGVnLL0eXHqr97GM1tloiWwwrJUUmj_ZjW5UOHFN1cc"
 
+# Curated targets - note that this is a copy of the master sheet taken on July 
+# 4th 2022 as a data freeze
+gsheets_curated <- "1ngjKoRGaOgF-8BlxUPK7o7XRg7wimTxYYQkSokSVYUM"
 
 
 # Metadata and other genomic tables
@@ -98,6 +100,10 @@ depr_path_mm <- paste0(meta_dir, "DE_prior_mm.tsv")
 chu2021_path_records <- paste0(meta_dir, "Chu2021_records_DTRI.tsv")
 chu2021_path_all <- paste0(meta_dir, "Chu2021_all_DTRI.tsv")
 
+# Output of formatted curated targets
+curated_path_all <- paste0(meta_dir, "Curated_targets_all_July2022.tsv")
+curated_path_pavlab <- paste0(meta_dir, "Curated_targets_pavlab_July2022.tsv")
+
 
 
 # ChIP-seq 
@@ -126,13 +132,13 @@ if (!grepl(Sys.getenv("PATH"), bwtool_path)) {
 
 
 # Where the result set files live
-rs_dir <- "/space/grp/amorin/Data/Expression_files/Gemma/Resultsets/"
+rs_dir <- "/space/grp/amorin/Expression_files/Gemma/Resultsets/"
 
 # Where to save the list of processed perturbation resultsets
-expr_dir <- "/space/grp/amorin/Data/Expression_files/Gemma/"
+expr_dir <- "/space/grp/amorin/Expression_files/Gemma/"
 
 # Where to save the perturb effect size matrices
-pmat_dir <- "/space/grp/amorin/Data/Expression_files/Perturb_matrix/"
+pmat_dir <- "/space/grp/amorin/Expression_files/Perturb_matrix/"
 
 
 # Intersect
