@@ -6,7 +6,8 @@
 ## TODO: ask about local vs utils functions
 ## TODO: pathing of pipeout chip/
 ## TODO: bulky plot functions local or utils?
-
+## TODO: ask about bulky config!
+## TODO: filepath instead of paste0
 
 # Variables of interest
 # ------------------------------------------------------------------------------
@@ -71,6 +72,9 @@ gsheets_curated <- "1ngjKoRGaOgF-8BlxUPK7o7XRg7wimTxYYQkSokSVYUM"
 
 meta_dir <- "/space/grp/amorin/Metadata/"
 
+# Final curated perturbation experiment metadata
+perturb_meta_path <- paste0(meta_dir, "batch1_tfperturb_meta_final_", date, ".tsv")
+
 # ENCODE blacklists
 bl_path_hg <- "/space/grp/amorin/Chromosome_info/blacklist_hg38.tsv"
 bl_path_mm <- "/space/grp/amorin/Chromosome_info/blacklist_mm10.tsv"
@@ -128,6 +132,7 @@ if (!grepl(Sys.getenv("PATH"), bwtool_path)) {
 
 
 # Perturbation
+# TODO: reconsider this pathing structure
 # ------------------------------------------------------------------------------
 
 
@@ -139,6 +144,22 @@ expr_dir <- "/space/grp/amorin/Expression_files/Gemma/"
 
 # Where to save the perturb effect size matrices
 pmat_dir <- "/space/grp/amorin/Expression_files/Perturb_matrix/"
+
+# RDS list objects of the filtered and unfiltered perturbation result sets
+rs_filt_path <- paste0(expr_dir, "TF_perturb_batch1_rslist_", date, ".RDS")
+rs_unfilt_path <- paste0(expr_dir, "TF_perturb_batch1_unfiltered_rslist_", date, ".RDS")
+
+# List of matrices of perturbation effect sizes
+pmat_path_hg <- paste0(pmat_dir, "human_list_perturb_matrix_", date, ".RDS")
+pmat_path_mm <- paste0(pmat_dir, "mouse_list_perturb_matrix_", date, ".RDS")
+pmat_path_ortho <- paste0(pmat_dir, "ortho_list_perturb_matrix_", date, ".RDS")
+
+# Output list of DE counts, grouped by TR or for all experiment combined
+prank_path_group <- paste0(expr_dir, "TF_perturb_DE_counts_list_by_TF_FDR01_", date, ".RDS")
+prank_path_all <- paste0(expr_dir, "TF_perturb_DE_counts_list_all_FDR01_", date, ".RDS")
+
+# R object of similarity between perturbation experiments
+perturb_sim_path <- paste0(scratch_dir, "perturb_similarity_", date, ".RDS")
 
 
 # Intersect
