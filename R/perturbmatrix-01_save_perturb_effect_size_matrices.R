@@ -8,19 +8,14 @@ library(parallel)
 source("R/setup-01_config.R")
 source("R/utils/gemma_functions.R")
 
-# Output is list of matrices of effect sizes
-outfile_hg <- paste0(pmat_dir, "human_list_perturb_matrix_", date, ".RDS")
-outfile_mm <- paste0(pmat_dir, "mouse_list_perturb_matrix_", date, ".RDS")
-outfile_ortho <- paste0(pmat_dir, "ortho_list_perturb_matrix_", date, ".RDS")
-
 # load meta and list of perturb experiments
-meta <- read.delim(file =  paste0(meta_dir, "batch1_tfperturb_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
-results <- readRDS(paste0(expr_dir, "TF_perturb_batch1_rslist_", date, ".RDS"))
+meta <- read.delim(perturb_meta_path, stringsAsFactors = FALSE)
+results <- readRDS(rs_filt_path)
 
 # protein coding tables for creating ortho table
-pc_hg <- read.delim(paste0(meta_dir, "refseq_select_hg38.tsv"), stringsAsFactors = FALSE)
-pc_mm <- read.delim(paste0(meta_dir, "refseq_select_mm10.tsv"), stringsAsFactors = FALSE)
-pc_ortho <- read.delim(paste0(meta_dir, "hg_mm_1to1_ortho_genes_DIOPT-v8.tsv"), stringsAsFactors = FALSE)
+pc_hg <- read.delim(ref_path_hg, stringsAsFactors = FALSE)
+pc_mm <- read.delim(ref_path_mm, stringsAsFactors = FALSE)
+pc_ortho <- read.delim(ortho_path, stringsAsFactors = FALSE)
 
 stopifnot(identical(names(results), meta$Experiment_ID))
 
@@ -134,6 +129,6 @@ mlist_ortho <- lapply(mlist_ortho, rm_all_na)
 
 # Save out
 
-saveRDS(mlist_hg, outfile_hg)
-saveRDS(mlist_mm, outfile_mm)
-saveRDS(mlist_ortho, outfile_ortho)
+saveRDS(mlist_hg, pmat_path_hg)
+saveRDS(mlist_mm, pmat_path_mm)
+saveRDS(mlist_ortho, pmat_path_ortho)

@@ -136,4 +136,4 @@ write.table(meta_loaded,
             sep = "\t",
             quote = FALSE,
             row.names = FALSE,
-            file = paste0(meta_dir, "batch1_tfperturb_meta_final_", date, ".tsv"))
+            file = perturb_meta_path)

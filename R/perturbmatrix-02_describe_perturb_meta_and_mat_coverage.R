@@ -12,10 +12,10 @@ source("R/utils/plot_functions.R")
 plot_dir <- paste0(pplot_dir, "Meta_sample_matrix/")
 
 # Load meta and lists of perturb effect size matrices
-meta <- read.delim(file =  paste0(meta_dir, "batch1_tfperturb_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
-mlist_hg <- readRDS(paste0(pmat_dir, "human_list_perturb_matrix_", date, ".RDS"))
-mlist_mm <- readRDS(paste0(pmat_dir, "mouse_list_perturb_matrix_", date, ".RDS"))
-mlist_ortho <- readRDS(paste0(pmat_dir, "ortho_list_perturb_matrix_", date, ".RDS"))
+meta <- read.delim(perturb_meta_path, stringsAsFactors = FALSE)
+mlist_hg <- readRDS(pmat_path_hg)
+mlist_mm <- readRDS(pmat_path_mm)
+mlist_ortho <- readRDS(pmat_path_ortho)
 
 # Expression platform info
 platform_meta <- read.delim(platform_path, stringsAsFactors = FALSE)

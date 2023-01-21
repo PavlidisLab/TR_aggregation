@@ -8,9 +8,6 @@ library(parallel)
 source("R/setup-01_config.R")
 source("R/utils/gemma_functions.R")
 
-out_file <- paste0(expr_dir, "TF_perturb_batch1_rslist_", date, ".RDS")
-out_file_unfilt <- paste0(expr_dir, "TF_perturb_batch1_unfiltered_rslist_", date, ".RDS")
-
 # curated sheet to link experiments to resultset IDs + relevant columns
 rs_df <- read_sheet(ss = gsheets_perturb, 
                     sheet = paste0("Curated_Loaded_resultset_IDs_", date), 
@@ -18,15 +15,15 @@ rs_df <- read_sheet(ss = gsheets_perturb,
                     col_types = "c")
 
 # meta to match/order saved experiments
-meta <- read.delim(paste0(meta_dir, "batch1_tfperturb_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
+meta <- read.delim(perturb_meta_path, stringsAsFactors = FALSE)
 
 rs_df <- rs_df[order(match(rs_df$Experiment_ID, meta$Experiment_ID)), ]
 
 stopifnot(identical(rs_df$Experiment_ID, meta$Experiment_ID))
 
 # protein coding genes
-pc_hg <- read.delim(paste0(meta_dir, "refseq_select_hg38.tsv"), stringsAsFactors = FALSE)
-pc_mm <- read.delim(paste0(meta_dir, "refseq_select_mm10.tsv"), stringsAsFactors = FALSE)
+pc_hg <- read.delim(ref_path_hg, stringsAsFactors = FALSE)
+pc_mm <- read.delim(ref_path_mm, stringsAsFactors = FALSE)
 
 
 # load each resultset into a list, making the following adjustments:
@@ -91,7 +88,7 @@ prep_rs_list <- function(rs_list, meta, symbol_hg, symbol_mm, cores) {
 
 
 
-if (!all(file.exists(out_file, out_file_unfilt))) {
+if (!all(file.exists(rs_filt_path, rs_unfilt_path))) {
   
   rs_list_unfilt <- load_rs_list(rs_df, cores = cores)
   
@@ -103,6 +100,6 @@ if (!all(file.exists(out_file, out_file_unfilt))) {
   
   stopifnot(all(unlist(lapply(rs_list_filt, ncol) == 9)))
   
-  saveRDS(rs_list_unfilt, file = out_file_unfilt)
-  saveRDS(rs_list_filt, file = out_file)
+  saveRDS(rs_list_unfilt, file = rs_unfilt_path)
+  saveRDS(rs_list_filt, file = rs_filt_path)
 }

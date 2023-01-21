@@ -15,15 +15,13 @@ source("R/utils/plot_functions.R")
 
 topn <- 500 # how many of the top genes to keep
 common_arg <- TRUE  # should comparison only be done for mutually measured genes?
-date <- "Apr2022"  # most recent data freeze
-outfile <- paste0(scratch_dir, date, "_perturb_similarity.RDS")
 plot_dir <- paste0(pplot_dir, "Experiment_similarity/")
 
 # Load meta and lists of perturb effect size matrices
-meta <- read.delim(file =  paste0(meta_dir, "batch1_tfperturb_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
-mlist_hg <- readRDS(paste0(pmat_dir, "human_list_perturb_matrix_", date, ".RDS"))
-mlist_mm <- readRDS(paste0(pmat_dir, "mouse_list_perturb_matrix_", date, ".RDS"))
-mlist_ortho <- readRDS(paste0(pmat_dir, "ortho_list_perturb_matrix_", date, ".RDS"))
+meta <- read.delim(perturb_meta_path, stringsAsFactors = FALSE)
+mlist_hg <- readRDS(pmat_path_hg)
+mlist_mm <- readRDS(pmat_path_mm)
+mlist_ortho <- readRDS(pmat_path_ortho)
 
 
 # General workflow is to generate exp x exp matrices where elements represent
@@ -42,7 +40,7 @@ mlist_ortho <- readRDS(paste0(pmat_dir, "ortho_list_perturb_matrix_", date, ".RD
 # NOTE: slow! get_overlap_matrices needs to be sped up
 
 
-if (!file.exists(outfile)) {
+if (!file.exists(perturb_sim_path)) {
   
   sim_list <- list(
     Human = perturb_sim_list(
@@ -81,11 +79,11 @@ if (!file.exists(outfile)) {
   )
   
   saveRDS(list(sim_list = sim_list, df_list = df_list), 
-          file = outfile)
+          file = perturb_sim_path)
   
 } else {
   
-  temp_dat <- readRDS(outfile)
+  temp_dat <- readRDS(perturb_sim_path)
   df_list <- temp_dat$df_list
   sim_list <- temp_dat$sim_list
   rm(temp_dat)

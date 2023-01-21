@@ -18,9 +18,9 @@ fc <- 1
 plot_dir <- paste0(pplot_dir, "Effect_size/")
 
 # Load meta and list of DE result sets +/- filtering
-meta <- read.delim(file =  paste0(meta_dir, "batch1_tfperturb_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
-results <- readRDS(paste0(expr_dir, "TF_perturb_batch1_rslist_", date, ".RDS"))
-results_unfilt <-  readRDS(paste0(expr_dir, "TF_perturb_batch1_unfiltered_rslist_", date, ".RDS"))
+meta <- read.delim(perturb_meta_path, stringsAsFactors = FALSE)
+results <- readRDS(rs_filt_path)
+results_unfilt <-  readRDS(rs_unfilt_path)
 
 stopifnot(identical(names(results), meta$Experiment_ID))
 
@@ -142,15 +142,6 @@ pert_df %>%
   mutate(Is_KD = (Perturbation == "Knockdown")) %>% 
   group_by(Is_KD) %>% 
   summarize(Median = median(Count_DEG))
-
-
-write.table(
-  x = pert_df,  
-  sep = "\t",
-  quote = FALSE,
-  row.names = FALSE,
-  file = paste0(expr_dir, date, "_perturbation_effect_sizes.tsv")
-)
 
 
 # Which TFs have unexpected perturbations (upregulated after KD/KO or downreg

@@ -14,22 +14,18 @@ source("R/utils/plot_functions.R")
 
 plot_dir <- paste0(pplot_dir, "Describe_FDR_counts/")
 
-# Output list of DE counts, grouped by TR or for all experiment combined
-tf_outfile <- paste0(expr_dir, "TF_perturb_DE_counts_list_by_TF_FDR01_", date, ".RDS")
-all_outfile <- paste0(expr_dir, "TF_perturb_DE_counts_list_all_FDR01_", date, ".RDS")
-
 # Load meta and lists of perturb effect size matrices
-meta <- read.delim(file =  paste0(meta_dir, "batch1_tfperturb_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
-mlist_hg <- readRDS(paste0(pmat_dir, "human_list_perturb_matrix_", date, ".RDS"))
-mlist_mm <- readRDS(paste0(pmat_dir, "mouse_list_perturb_matrix_", date, ".RDS"))
-mlist_ortho <- readRDS(paste0(pmat_dir, "ortho_list_perturb_matrix_", date, ".RDS"))
+meta <- read.delim(perturb_meta_path, stringsAsFactors = FALSE)
+mlist_hg <- readRDS(pmat_path_hg)
+mlist_mm <- readRDS(pmat_path_mm)
+mlist_ortho <- readRDS(pmat_path_ortho)
 
 # ortho protein coding genes
-pc_ortho <- read.delim(paste0(meta_dir, "hg_mm_1to1_ortho_genes_DIOPT-v8.tsv"), stringsAsFactors = FALSE)
+pc_ortho <- read.delim(ortho_path, stringsAsFactors = FALSE)
 
 # DE prior tables
-pdeg_hg <- read.delim(paste0(meta_dir, "DE_prior_hg.tsv"), stringsAsFactors = FALSE)
-pdeg_mm <- read.delim(paste0(meta_dir, "DE_prior_mm.tsv"), stringsAsFactors = FALSE)
+pdeg_hg <- read.delim(depr_path_hg, stringsAsFactors = FALSE)
+pdeg_mm <- read.delim(depr_path_mm, stringsAsFactors = FALSE)
 
 # Split meta by species
 meta_mm <- meta[meta$Species == "Mouse", ]
@@ -38,7 +34,7 @@ meta_hg <- meta[meta$Species == "Human", ]
 
 # List of data frames summarizing gene stats across perturbation experiments.
 # Generate for all experiments and split by TF experiments. 
-#
+# --
 # Count_DE: Tally of gene being diff expr at FDR cutoff across experiments
 # Proportion_DE_measured: Prop. of DE across experiments with non-NAs for gene
 # Proportion_DE_all: Prop. of DE across all experiments
@@ -334,8 +330,8 @@ cor(context_df$Exp1, context_df$Exp2, use = "pairwise.complete.obs")
 
 # Save out
 
-saveRDS(all_de, file = all_outfile)
-saveRDS(tf_de, file = tf_outfile)
+saveRDS(all_de, file = prank_path_all)
+saveRDS(tf_de, file = prank_path_group)
 
 
 # Plots
