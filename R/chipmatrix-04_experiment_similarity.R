@@ -88,19 +88,19 @@ diff_geo_mm <- filter(df_list$Mouse, as.character(GEO1) != as.character(GEO2))
 # higher top 500 overlap compared to any inter-HES1 pair.
 
 hes1_intra_hg <- df_list$Human %>%
-  filter((as.character(TF1) == "Hes1" | as.character(TF2) == "Hes1") & Group == "In_TR_in_species")
+  filter((as.character(TF1) == "HES1" | as.character(TF2) == "HES1") & Group == "In_TR_in_species")
 
 summary(hes1_intra_hg$Intersect)
 summary(hes1_intra_hg$Pcor)
 
 hes1_inter_hg <- df_list$Human %>%
-  filter((as.character(TF1) == "Hes1" | as.character(TF2) == "Hes1") & Group == "Out") %>% 
+  filter((as.character(TF1) == "HES1" | as.character(TF2) == "HES1") & Group == "Out") %>% 
   arrange(desc(Pcor))
 
 summary(hes1_inter_hg$Intersect)
 summary(hes1_inter_hg$Pcor)
 
-k562 <- filter(meta, Cell_Type == "K562")$Experiment_ID
+k562 <- filter(meta, Cell_Type == "K-562")$Experiment_ID
 mcf7 <- filter(meta, Cell_Type == "MCF-7")$Experiment_ID
 
 hes1_k562 <- filter(hes1_inter_hg, Row %in% k562 & Col %in% k562) 
