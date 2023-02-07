@@ -14,7 +14,7 @@ rank_outfile <- paste0(scratch_dir, date, "_ranked_target_list.RDS")
 dat_outfile <- paste0(scratch_dir, date, "_all_data_list.RDS")
 
 # Loading perturb data
-perturb_meta <- read.delim(paste0(meta_dir, "Gemma/batch1_tfperturb_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
+perturb_meta <- read.delim(perturb_meta_path, stringsAsFactors = FALSE)
 perturb_hg <- readRDS(paste0(pmat_dir, "human_list_perturb_matrix_", date, ".RDS"))
 perturb_mm <- readRDS(paste0(pmat_dir, "mouse_list_perturb_matrix_", date, ".RDS"))
 perturb_ortho <- readRDS(paste0(pmat_dir, "ortho_list_perturb_matrix_", date, ".RDS"))
