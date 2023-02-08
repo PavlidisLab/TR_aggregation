@@ -15,6 +15,9 @@ source("R/utils/plot_functions.R")
 rank_list <- readRDS(paste0(scratch_dir, date, "_ranked_target_list.RDS"))
 dat_list <- readRDS(paste0(scratch_dir, date, "_all_data_list.RDS"))
 
+# Curated targets
+lt <- read.delim(curated_path_all, stringsAsFactors = FALSE)
+
 tr_hg <- unique(filter(dat_list$Binding$Meta, Species == "Human")$Symbol)
 tr_mm <- unique(filter(dat_list$Binding$Meta, Species == "Mouse")$Symbol)
 
@@ -399,3 +402,17 @@ auprc_k_list <- lapply(k, function(x) {
 
 auprc_k_df <- round(do.call(rbind, auprc_k_list), 4)
 rownames(auprc_k_df) <- paste0("step=", k)
+
+
+# Mpo as curated target that is high in minimal integrated rank but not in
+# aggregate. 
+# "synthesized during myeloid differentiation that constitutes the major 
+# component of neutrophil azurophilic granules" https://www.proteinatlas.org/ENSG00000005381-MPO
+# curated cell type: JURKAT
+# lowest rank chip cell type: HPC-7 (Hematopoietic precursor)
+# lowest rank perturb cell type: Granulocyte-macrophage progenitors
+
+filter(lt, str_to_title(TF_Symbol) == "Runx1" & str_to_title(Target_Symbol) == "Mpo")
+filter(rank_df, Symbol == "Mpo")
+which.min(bind_rank_mm["Mpo", filter(dat_list$Binding$Meta, Symbol == "Runx1")$Experiment_ID])
+which.min(perturb_rank_mm["Mpo", filter(dat_list$Perturbation$Meta, Symbol == "Runx1")$Experiment_ID])
