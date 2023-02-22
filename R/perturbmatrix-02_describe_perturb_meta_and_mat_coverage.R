@@ -9,7 +9,7 @@ library(RColorBrewer)
 source("R/setup-01_config.R")
 source("R/utils/plot_functions.R")
 
-plot_dir <- paste0(pplot_dir, "Meta_sample_matrix/")
+plot_dir <- file.path(pplot_dir, "Meta_sample_matrix/")
 
 # Load meta and lists of perturb effect size matrices
 meta <- read.delim(perturb_meta_path, stringsAsFactors = FALSE)
@@ -176,9 +176,9 @@ p1a <- meta %>%
   theme_classic() +
   scale_fill_manual(values = c("royalblue", "goldenrod")) +
   theme(axis.title.x = element_blank(),
-        axis.title.y = element_text(size = 30),
-        axis.text.y = element_text(size = 30),
-        axis.text.x = element_text(size = 30, angle = 60, vjust = 1, hjust = 1),
+        axis.title.y = element_text(size = 40),
+        axis.text.y = element_text(size = 40),
+        axis.text.x = element_text(size = 40, angle = 60, vjust = 1, hjust = 1),
         legend.text = element_text(size = 15),
         legend.title = element_text(size = 15),
         legend.position = "bottom")
@@ -189,7 +189,7 @@ p1b <- p1a +
   coord_flip() +
   ylab("Count of experiments") +
   theme(axis.title.y = element_blank(),
-        axis.title.x = element_text(size = 30),
+        axis.title.x = element_text(size = 45),
         legend.position = "none")
   
 ggsave(p1b, dpi = 300, device = "png", height = 10, width = 12, 
@@ -241,9 +241,10 @@ p3a <-
   xlab("Count of genes") +
   scale_x_continuous(breaks = scales::pretty_breaks(n = 5)) +
   theme_classic() +
-  theme(axis.title = element_text(size = 25),
-        axis.text = element_text(size = 25),
-        title = element_text(size = 25))
+  theme(axis.title = element_text(size = 35),
+        axis.text = element_text(size = 30),
+        title = element_text(size = 35),
+        plot.margin = margin(10, 20, 10, 10))  # add padding)
 
 
 p3b <- 
@@ -255,9 +256,10 @@ p3b <-
   xlab("Count of genes") +
   scale_x_continuous(breaks = scales::pretty_breaks(n = 5)) +
   theme_classic() +
-  theme(axis.title = element_text(size = 25),
-        axis.text = element_text(size = 25),
-        title = element_text(size = 25))
+  theme(axis.title = element_text(size = 35),
+        axis.text = element_text(size = 30),
+        title = element_text(size = 35),
+        plot.margin = margin(10, 20, 10, 10))  # add padding)
 
 
 p3c <- 
@@ -269,9 +271,9 @@ p3c <-
   xlab("Count of genes") +
   scale_x_continuous(breaks = scales::pretty_breaks(n = 5)) +
   theme_classic() +
-  theme(axis.title = element_text(size = 25),
-        axis.text = element_text(size = 25),
-        title = element_text(size = 25))
+  theme(axis.title = element_text(size = 35),
+        axis.text = element_text(size = 30),
+        title = element_text(size = 35))
 
 
 ggsave(p3a, height = 9, width = 14, dpi = 300, device = "png",

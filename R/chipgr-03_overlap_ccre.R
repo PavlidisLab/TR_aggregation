@@ -11,7 +11,7 @@ source("R/utils/range_table_functions.R")
 source("R/utils/similarity_functions.R")
 
 pipeline_dir <- paste0(pipeout_dir, "chip/")
-plot_dir <- paste0(cplot_dir, "GRanges/")
+plot_dir <- file.path(cplot_dir, "GRanges/")
 
 # GRanges objects
 gr_hg <- readRDS(paste0(gr_dir, "human_batch1_grlist_", date, ".RDS"))
@@ -536,12 +536,12 @@ exp_barchart <- function(plot_df, group_fill, colours) {
           axis.ticks.x = element_blank(),
           strip.background = element_blank(),
           strip.text = element_text(size = 14),
-          axis.text = element_text(size = 25),
-          axis.title = element_text(size = 25),
+          axis.text = element_text(size = 40),
+          axis.title = element_text(size = 40),
           legend.text = element_text(size = 20),
           legend.title = element_text(size = 20),
           legend.position = "bottom",
-          plot.margin = margin(10, 10, 10, 10))  # add padding for removing legend
+          plot.margin = margin(10, 10, 20, 10))  # add padding
   
 }
 
@@ -558,10 +558,10 @@ ccre_barchart <- function(ccre_df, colours) {
     theme(axis.text.x = element_blank(),
           axis.ticks.x = element_blank(),
           axis.title.x = element_blank(),
-          axis.text = element_text(size = 25),
-          axis.title = element_text(size = 25),
+          axis.text = element_text(size = 40),
+          axis.title = element_text(size = 40),
           legend.position = "none",
-          plot.margin = margin(10, 10, 10, 10))  # add padding for removing legend
+          plot.margin = margin(10, 10, 20, 10))  # add padding
 }
 
 
@@ -738,9 +738,10 @@ p3a <-
   ylim(c(0, 0.6)) +
   theme_classic() +
   theme(axis.title.x = element_blank(),
-        axis.title.y = element_text(size = 20),
-        axis.text = element_text(size = 20),
-        axis.text.x = element_text(size = 15, angle = 90, vjust = 0.5, hjust = 1))
+        axis.title.y = element_text(size = 25),
+        axis.text.y = element_text(size = 20),
+        axis.text.x = element_text(size = 20, angle = 90, vjust = 0.5, hjust = 1),
+        plot.title = element_text(size = 20))
 
 p3b <- 
   data.frame(group_prop_hg[non_kasumi, ]) %>% 
@@ -753,9 +754,10 @@ p3b <-
   ylim(c(0, 0.6)) +
   theme_classic() +
   theme(axis.title.x = element_blank(),
-        axis.title.y = element_text(size = 20),
-        axis.text = element_text(size = 20),
-        axis.text.x = element_text(size = 15, angle = 90, vjust = 0.5, hjust = 1))
+        axis.title.y = element_text(size = 25),
+        axis.text.y = element_text(size = 20),
+        axis.text.x = element_text(size = 20, angle = 90, vjust = 0.5, hjust = 1),
+        plot.title = element_text(size = 20))
 
 
 ggsave(plot_grid(p3a, p3b),

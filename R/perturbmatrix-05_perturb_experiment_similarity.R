@@ -15,7 +15,7 @@ source("R/utils/plot_functions.R")
 
 topn <- 500 # how many of the top genes to keep
 common_arg <- TRUE  # should comparison only be done for mutually measured genes?
-plot_dir <- paste0(pplot_dir, "Experiment_similarity/")
+plot_dir <- file.path(pplot_dir, "Experiment_similarity/")
 
 # Load meta and lists of perturb effect size matrices
 meta <- read.delim(perturb_meta_path, stringsAsFactors = FALSE)
@@ -213,11 +213,11 @@ ggsave(plot_grid(plotlist = p4c, nrow = 2),
 
 p5a <- dplot(df_list$Human, stat = "Pval_Intersect", stat_name = "Top-500 Overlap by P-value", species = "Human")
 p5b <- dplot(df_list$Mouse, stat = "Pval_Intersect", stat_name = "Top-500 Overlap by P-value", species = "Mouse")
-p5c <- dplot(df_list$Ortho, stat = "Pval_Intersect", stat_name = "Top-500 Overlap by P-value", species = "Ortho")
+p5c <- dplot(df_list$Ortho, stat = "Pval_Intersect", stat_name = "Top-500 Overlap by P-value", species = "Ortho") + theme(legend.position = c(0.70, 0.90))
 
-p5d <- dplot(df_list$Human, stat = "Pcor", stat_name = "Pearson correlation", species = "Human")
-p5e <- dplot(df_list$Mouse, stat = "Pcor", stat_name = "Pearson correlation", species = "Mouse")
-p5f <- dplot(df_list$Ortho, stat = "Pcor", stat_name = "Pearson correlation", species = "Ortho")
+p5d <- dplot(df_list$Human, stat = "Pcor", stat_name = "Pearson's correlation", species = "Human")
+p5e <- dplot(df_list$Mouse, stat = "Pcor", stat_name = "Pearson's correlation", species = "Mouse")
+p5f <- dplot(df_list$Ortho, stat = "Pcor", stat_name = "Pearson's correlation", species = "Ortho")
 
 
 ggsave(p5a, dpi = 300, device = "png", height = 6, width = 8,

@@ -81,9 +81,9 @@ stat_vboxplot <- function(df,
                       c("In_TR_in_species", "In_TR_out_species", "Out")))
   
   if (ortho) {
-    levels(df$Group) <- c("TR+ S+", "TR+ S-", "Out")
+    levels(df$Group) <- c("TR+S+", "TR+S-", "Out")
   } else {
-    levels(df$Group) <- c("Intra-TR", "TR+ S-", "Inter-TR")
+    levels(df$Group) <- c("Intra-TR", "TR+S-", "Inter-TR")
   }
   
   ggplot(df, aes(x = !!sym(x_var), y = !!sym(y_var))) +
@@ -93,11 +93,11 @@ stat_vboxplot <- function(df,
     ggtitle(title) +
     ylab(y_name) +
     theme_classic() +
-    theme(axis.title = element_text(size = 25),
+    theme(axis.title = element_text(size = 30),
           axis.title.x = element_blank(),
-          axis.text.y = element_text(size = 25),
-          axis.text.x = element_text(size = 25),
-          plot.title = element_text(size = 25, hjust = 0.5))
+          axis.text.y = element_text(size = 30),
+          axis.text.x = element_text(size = 27),
+          plot.title = element_text(size = 30, hjust = 0.5))
 }
 
 
@@ -160,10 +160,10 @@ dplot <- function(df,
     ggtitle(species) +
     scale_fill_manual(values = fill_col, labels = legend_text) +
     theme(
-      axis.text = element_text(size = 25),
-      axis.title = element_text(size = 25),
+      axis.text = element_text(size = 30),
+      axis.title = element_text(size = 30),
       plot.title = element_text(hjust = 0.5, size = 30),
-      legend.position = c(0.75, 0.85),
+      legend.position = c(0.75, 0.90),
       legend.text = element_text(size = 20),
       legend.title = element_blank(),
       plot.margin = margin(10, 20, 10, 10)  # xaxis was getting clipped for pcor

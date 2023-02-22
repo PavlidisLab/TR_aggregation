@@ -7,7 +7,7 @@ library(cowplot)
 source("R/setup-01_config.R")
 source("R/utils/plot_functions.R")
 
-plot_dir <- paste0(cplot_dir, "Describe_meta/")
+plot_dir <- file.path(cplot_dir, "Describe_meta/")
 
 # meta final is what is used for analysis - filtered for min peaks and passing IDR/overlap
 # meta runs is all completed runs (including those under min peak) - used for plotting
@@ -180,9 +180,9 @@ p2a <- meta_final %>%
   theme_classic() +
   scale_fill_manual(values = c("royalblue", "goldenrod")) +
   theme(axis.title.x = element_blank(),
-        axis.title.y = element_text(size = 30),
-        axis.text.y = element_text(size = 30),
-        axis.text.x = element_text(size = 30, angle = 60, vjust = 1, hjust = 1),
+        axis.title.y = element_text(size = 40),
+        axis.text.y = element_text(size = 40),
+        axis.text.x = element_text(size = 40, angle = 60, vjust = 1, hjust = 1),
         legend.text = element_text(size = 15),
         legend.title = element_text(size = 15),
         legend.position = "bottom")
@@ -193,7 +193,7 @@ p2b <- p2a +
   coord_flip() +
   ylab("Count of experiments") +
   theme(axis.title.y = element_blank(),
-        axis.title.x = element_text(size = 30),
+        axis.title.x = element_text(size = 45),
         legend.position = "none")
 
 ggsave(p2b, dpi = 300, device = "png", height = 10, width = 12,
@@ -217,7 +217,7 @@ plot_jitter_median <- function(df, xvar, yvar, ylab, hline = NULL) {
     scale_fill_manual(values = c("royalblue", "goldenrod")) +
     theme_classic() +
     theme(axis.title.x = element_blank(),
-          axis.title.y = element_text(size = 25),
+          axis.title.y = element_text(size = 30),
           axis.text = element_text(size = 18),
           legend.text = element_text(size = 20),
           legend.title = element_text(size = 20))
@@ -229,8 +229,9 @@ plot_jitter_median <- function(df, xvar, yvar, ylab, hline = NULL) {
 p3a <- meta_runs %>% 
   dplyr::mutate(Symbol = str_to_upper(Symbol),
                 Peaks = log10(N_overlap_peaks)) %>% 
-  plot_jitter_median(ylab = "Log10 count of overlap peaks", yvar = "Peaks", xvar = "Symbol")
-
+  plot_jitter_median(ylab = bquote(~Log[10]~ "count of overlap peaks"),
+                     yvar = "Peaks", 
+                     xvar = "Symbol")
 
 ggsave(p3a, dpi = 300, device = "png", height = 8, width = 12,
        file = paste0(plot_dir, "batch1_chip_count_overlap_peaks_by_symbol_", date, ".png"))
@@ -240,7 +241,9 @@ ggsave(p3a, dpi = 300, device = "png", height = 8, width = 12,
 p3b <- meta_runs %>% 
   dplyr::mutate(Symbol = str_to_upper(Symbol),
          Peaks = log10(N_IDR_peaks)) %>% 
-  plot_jitter_median(ylab = "Log10 count of IDR peaks", yvar = "Peaks", xvar = "Symbol")
+  plot_jitter_median(ylab = bquote(~Log[10]~ "count of IDR peaks"),
+                     yvar = "Peaks", 
+                     xvar = "Symbol")
 
 ggsave(p3b, dpi = 300, device = "png", height = 8, width = 12,
        file = paste0(plot_dir, "batch1_chip_count_IDR_peaks_by_symbol_", date, ".png"))
@@ -250,7 +253,7 @@ ggsave(p3b, dpi = 300, device = "png", height = 8, width = 12,
 p3c <- meta_runs %>% 
   dplyr::mutate(Symbol = str_to_upper(Symbol),
          Peaks = log10(N_peaks)) %>% 
-  plot_jitter_median(ylab = "Log10 count of reproducible peaks",
+  plot_jitter_median(ylab = bquote(~Log[10]~ "count of reproducible peaks"),
                      yvar = "Peaks", xvar = "Symbol",
                      hline = log10(min_peaks))
 
@@ -270,14 +273,16 @@ p4 <- meta_final %>%
   stat_summary(aes(x = Has_input, y = log10(N_peaks)), 
                fun = median, fun.min = median, fun.max = median, 
                geom = "crossbar", width = 0.4, inherit.aes = FALSE) +
-  ylab("Log10 count of reproducible peaks") + 
+  ylab(bquote(~Log[10]~ "count of reproducible peaks")) + 
   xlab("Has input control") +
   scale_fill_manual(values = tf_pal_hg) +
   theme_classic() +
-  theme(axis.title = element_text(size = 20),
-        axis.text = element_text(size = 20))
+  theme(axis.title = element_text(size = 25),
+        axis.text = element_text(size = 25),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20))
 
-ggsave(p4, dpi = 300, device = "png", height = 6, width = 4,
+ggsave(p4, dpi = 300, device = "png", height = 8, width = 6,
        file = paste0(plot_dir, "batch1_chip_count_tf-idr_mecp2_overlap_peaks_by_input_", date, ".png"))
 
 
@@ -330,8 +335,8 @@ p5c <- meta_final %>%
   ggplot(aes(y = log10(N_peaks), x = log10(Avg_exp_mapped_reads_nodup))) +
   geom_point() +
   geom_smooth(method = lm) +
-  ylab("Log10 count of reproducible peaks") +
-  xlab("Log10 count of average mapped reads") +
+  ylab(bquote(~Log[10]~ "count of reproducible peaks")) +
+  xlab(bquote(~Log[10]~ "count of averaged mapped reads")) +
   theme_classic() +
   theme(axis.title = element_text(size = 20),
         axis.text = element_text(size = 20))

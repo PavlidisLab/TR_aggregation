@@ -12,7 +12,7 @@ source("R/utils/similarity_functions.R")
 source("R/utils/plot_functions.R")
 
 topn <- 500 # how many of the top genes to keep
-plot_dir <- paste0(cplot_dir, "Binding_similarity/")
+plot_dir <- file.path(cplot_dir, "Binding_similarity/")
 outfile <- paste0(scratch_dir, date, "_chip_similarity_refseq.RDS")
 
 # Loading ChIP-seq data
@@ -167,13 +167,13 @@ sum(df$Exp2 == 1)
 # Violin+boxplot of group differences for all experiments
 
 
-p1a <- stat_vboxplot(df_list$Human, y_var = "Pcor", y_name = "Pearson correlation", title = "Human ChIP-seq")
+p1a <- stat_vboxplot(df_list$Human, y_var = "Pcor", y_name = "Pearson's correlation", title = "Human ChIP-seq")
 p1b <- stat_vboxplot(df_list$Human, y_var = "Intersect", y_name = paste0("Top-", topn, " overlap"), title = "Human ChIP-seq")
 
-p1c <- stat_vboxplot(df_list$Mouse, y_var = "Pcor", y_name = "Pearson correlation", title = "Mouse ChIP-seq")
+p1c <- stat_vboxplot(df_list$Mouse, y_var = "Pcor", y_name = "Pearson's correlation", title = "Mouse ChIP-seq")
 p1d <- stat_vboxplot(df_list$Mouse, y_var = "Intersect", y_name = paste0("Top-", topn, " overlap"), title = "Mouse ChIP-seq")
 
-p1e <- stat_vboxplot(df_list$Ortho, y_var = "Pcor", y_name = "Pearson correlation", title = "Ortho ChIP-seq", ortho = TRUE)
+p1e <- stat_vboxplot(df_list$Ortho, y_var = "Pcor", y_name = "Pearson's correlation", title = "Ortho ChIP-seq", ortho = TRUE)
 p1f <- stat_vboxplot(df_list$Ortho, y_var = "Intersect", y_name = paste0("Top-", topn, " overlap"), title = "Ortho ChIP-seq", ortho = TRUE)
 
 
@@ -199,16 +199,17 @@ p2b <- tf_vboxplot(df_list$Mouse, y_var = "Intersect", y_name = paste0("Top-", t
 p2c <- tf_vboxplot(df_list$Ortho, y_var = "Intersect", y_name = paste0("Top-", topn, " overlap"), title_prefix = "Ortho", ortho = TRUE)
 
 
+
 ggsave(plot_grid(plotlist = p2a, nrow = 2),
-       dpi = 300, device = "png", height = 12, width = 20,
+       dpi = 300, device = "png", height = 12, width = 24, bg = "white",
        filename = paste0(plot_dir, "Vbplot_tf_human_intersect_", date, ".png"))
 
 ggsave(plot_grid(plotlist = p2b, nrow = 2),
-       dpi = 300, device = "png", height = 12, width = 20,
+       dpi = 300, device = "png", height = 12, width = 24, bg = "white",
        filename = paste0(plot_dir, "Vbplot_tf_mouse_intersect_", date, ".png"))
 
 ggsave(plot_grid(plotlist = p2c, nrow = 2),
-       dpi = 300, device = "png", height = 12, width = 24,
+       dpi = 300, device = "png", height = 12, width = 24, bg = "white",
        filename = paste0(plot_dir, "Vbplot_tf_ortho_intersect_", date, ".png"))
 
 
@@ -217,9 +218,9 @@ ggsave(plot_grid(plotlist = p2c, nrow = 2),
 xmin <- -0.4
 xmax <- 0.9
 
-p3a <- dplot(df_list$Human, stat = "Pcor", stat_name = "Pearson correlation", species = "Human") + xlim(xmin, xmax)
-p3b <- dplot(df_list$Mouse, stat = "Pcor", stat_name = "Pearson correlation", species = "Mouse") + xlim(xmin, xmax)
-p3c <- dplot(df_list$Ortho, stat = "Pcor", stat_name = "Pearson correlation", species = "Ortho") + xlim(xmin, xmax)
+p3a <- dplot(df_list$Human, stat = "Pcor", stat_name = "Pearson's correlation", species = "Human") + xlim(xmin, xmax)
+p3b <- dplot(df_list$Mouse, stat = "Pcor", stat_name = "Pearson's correlation", species = "Mouse") + xlim(xmin, xmax)
+p3c <- dplot(df_list$Ortho, stat = "Pcor", stat_name = "Pearson's correlation", species = "Ortho") + xlim(xmin, xmax)
 
 
 ggsave(p3a, dpi = 300, device = "png", height = 6, width = 8,
@@ -242,11 +243,11 @@ p4b <- dplot(filter(df_list$Ortho, TF1 != "Runx1" & TF2 != "Runx1"),
 p4b <- p4b + ggtitle("Ortho excluding RUNX1")
 
 
-p4c <- dplot(df_list$Ortho, stat = "Pcor", stat_name = "Pearson correlation", species = "Ortho")
+p4c <- dplot(df_list$Ortho, stat = "Pcor", stat_name = "Pearson's correlation", species = "Ortho")
 p4c <- p4c + ggtitle("Ortho including RUNX1") + theme(legend.position = "none")
 
 p4d <- dplot(filter(df_list$Ortho, TF1 != "Runx1" & TF2 != "Runx1"),
-             stat = "Pcor", stat_name = "Pearson correlation", species = "Ortho")
+             stat = "Pcor", stat_name = "Pearson's correlation", species = "Ortho")
 p4d <- p4d + ggtitle("Ortho excluding RUNX1")
 
 

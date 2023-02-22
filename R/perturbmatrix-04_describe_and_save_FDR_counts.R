@@ -12,7 +12,7 @@ source("R/setup-01_config.R")
 source("R/utils/perturbmatrix_functions.R")
 source("R/utils/plot_functions.R")
 
-plot_dir <- paste0(pplot_dir, "Describe_FDR_counts/")
+plot_dir <- file.path(pplot_dir, "Describe_FDR_counts/")
 
 # Load meta and lists of perturb effect size matrices
 meta <- read.delim(perturb_meta_path, stringsAsFactors = FALSE)
@@ -362,9 +362,9 @@ hist_plot <- function(all_df, var, colour, fdr, title) {
     ylab("Count") +
     xlab(xlab) +
     ggtitle(title) +
-    theme(axis.text = element_text(size = 25),
-          axis.title = element_text(size = 25),
-          plot.title = element_text(size = 25))
+    theme(axis.text = element_text(size = 30),
+          axis.title = element_text(size = 30),
+          plot.title = element_text(size = 35))
   
 }
 
@@ -415,11 +415,12 @@ de_scatter <- function(all_df, fdr, title) {
     xlab(paste0("Count DE (FDR < ", fdr, ")")) +
     ggtitle(title) +
     scale_fill_gradient(low = "lightgrey", high = "black", name = "Count per bin") +
-    theme(axis.text = element_text(size = 25),
-          axis.title = element_text(size = 25),
-          plot.title = element_text(size = 25),
-          legend.text = element_text(size = 25),
-          legend.title = element_text(size = 25))
+    theme(axis.text = element_text(size = 30),
+          axis.title = element_text(size = 35),
+          plot.title = element_text(size = 30),
+          legend.text = element_text(size = 30),
+          legend.title = element_text(size = 30),
+          plot.margin = margin(10, 20, 10, 10))
 }
 
 
@@ -473,9 +474,9 @@ p4a <- all_de$Human %>%
   ylab("DE prior rank") +
   ggtitle(paste0("Human n=", nrow(meta_hg), " experiments")) +
   theme_classic() +
-  theme(axis.text = element_text(size = 15),
-        axis.title = element_text(size = 25),
-        plot.title = element_text(size = 25))
+  theme(axis.text = element_text(size = 25),
+        axis.title = element_text(size = 30),
+        plot.title = element_text(size = 30))
 
 
 
@@ -499,10 +500,10 @@ p4_list <- lapply(names(top_list), function(x) {
                 shape = 21, size = 3, width = 0.1, height = 0.1) +
     scale_fill_manual(values = c("white", "red")) +
     ggtitle(x) +
-    ylab("Log2 Fold Change") +
+    ylab(bquote(~Log[2]~ "Fold Change")) +
     theme_classic() +
-    theme(axis.text = element_text(size = 15),
-          axis.title = element_text(size = 20),
+    theme(axis.text = element_text(size = 20),
+          axis.title = element_text(size = 25),
           axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1), 
           axis.title.x = element_blank(),
           plot.title = element_text(size = 20, hjust = 0.5))
@@ -538,9 +539,13 @@ plot_tf_hist <- function(tf_list, meta, species, tf_pal) {
       ggtitle(paste0(tf, " n=", n_tf)) +
       scale_x_continuous(breaks = pretty_breaks) +
       theme(
-        axis.text = element_text(size = 30),
-        axis.title = element_text(size = 30),
-        plot.title = element_text(size = 35),
+        # axis.text = element_text(size = 30),
+        # axis.title = element_text(size = 30),
+        # plot.title = element_text(size = 35),
+        # plot.margin = margin(10, 15, 10, 10))
+        axis.text = element_text(size = 35),
+        axis.title = element_text(size = 35),
+        plot.title = element_text(size = 34),
         plot.margin = margin(10, 15, 10, 10))
   })
   names(p_l) <- tfs
@@ -598,9 +603,10 @@ purity_de_bplot <- function(tf_list,
                 alpha = 0.05) +
       geom_boxplot(width = 0.4) +
       xlab("Count DE FDR < 0.1") +
+      ylab("FC Purity") +
       ggtitle(paste(species, x)) +
       theme_classic() +
-      theme(axis.text = element_text(size = 15),
+      theme(axis.text = element_text(size = 20),
             axis.title = element_text(size = 25),
             plot.title = element_text(size = 25))
   })

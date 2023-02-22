@@ -9,7 +9,7 @@ source("R/setup-01_config.R")
 source("R/utils/plot_functions.R")
 
 topn <- 500  # number of top genes to consider
-plot_dir <- paste0(iplot_dir, "Gene_rankings/")
+plot_dir <- file.path(iplot_dir, "Gene_rankings/")
 
 # List of all TR rankings and data matrices
 rank_list <- readRDS(paste0(scratch_dir, date, "_ranked_target_list.RDS"))
@@ -345,8 +345,8 @@ plot_scatter <- function(df, tf) {
                 alpha = 1, shape = 21, size = 3, col = "black", height = 0.3, width = 0.01) +
     geom_text_repel(data = df[df$Group == "Top", ],
                     aes(x = Mean_bind, y = Count_DE, label = Symbol),
-                    force = 1, force_pull = 2, size = 5, max.overlaps = 20) +
-    xlab("Mean bind score") +
+                    force = 1, force_pull = 2, size = 7, max.overlaps = 20) +
+    xlab("Mean binding score") +
     ylab("Count DE (FDR < 0.1)") +
     ggtitle(tf) +
     scale_y_continuous(breaks = pretty_breaks) +
@@ -361,10 +361,10 @@ plot_scatter <- function(df, tf) {
     theme_classic() +
     theme(
       axis.text = element_text(size = 25),
-      axis.title = element_text(size = 25),
-      plot.title = element_text(size = 25),
-      legend.text = element_text(size = 20),
-      legend.title = element_text(size = 20),
+      axis.title = element_text(size = 30),
+      plot.title = element_text(size = 30),
+      legend.text = element_text(size = 25),
+      legend.title = element_text(size = 25),
       plot.margin = margin(10, 10, 10, 10)
     )
 }

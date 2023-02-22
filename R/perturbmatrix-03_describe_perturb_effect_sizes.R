@@ -15,7 +15,7 @@ source("R/utils/plot_functions.R")
 # fdr (false discovery rate control for DE) declared in config
 fc <- 1
 
-plot_dir <- paste0(pplot_dir, "Effect_size/")
+plot_dir <- file.path(pplot_dir, "Effect_size/")
 
 # Load meta and list of DE result sets +/- filtering
 meta <- read.delim(perturb_meta_path, stringsAsFactors = FALSE)
@@ -307,7 +307,7 @@ p1 <-
   scale_x_discrete(expand = c(0.1, 0.1)) +  # points were getting cut off
   geom_hline(yintercept = 0, linetype = "dashed") +
   facet_grid(. ~ Perturbation) +
-  ylab("Log2 fold change of perturbed TR") +
+  ylab(bquote(~Log[2]~ "fold change of perturbed TR")) +
   theme_bw() +
   theme(axis.text.x = element_blank(),
         axis.ticks.x = element_blank(),
@@ -361,7 +361,7 @@ p3a <-
   geom_point(size = 4.6, color = "black", shape = 21) +
   facet_grid(. ~ Symbol) +
   scale_x_discrete(expand = c(0.2, 0.2)) +  # points were getting cut off
-  ylab(paste0("log10 Count of DEGs at FDR", fdr)) +
+  ylab(bquote(~Log[10]~ "Count of DEGs at FDR 0.1")) +
   theme_bw() +
   theme(axis.title.x = element_blank(),
         axis.text.x = element_blank(),        
@@ -380,7 +380,7 @@ p3b <-
   geom_point(size = 5.5, color = "black", shape = 21) +
   facet_grid(. ~ Symbol) +
   scale_x_discrete(expand = c(0.2, 0.2)) +  # points were getting cut off
-  ylab(paste0("log10 Count of DEGs at FDR", fdr)) +
+  ylab(bquote(~Log[10]~ "Count of DEGs at FDR 0.1")) +
   theme_bw() +
   theme(axis.title.x = element_blank(),
         axis.text.x = element_blank(),        
@@ -400,7 +400,7 @@ p3c <-
   geom_point(size = 5.5, color = "black") +
   facet_grid(. ~ Symbol) +
   scale_x_discrete(expand = c(0.2, 0.2)) +  # points were getting cut off
-  ylab(paste0("log10 Count of DEGs at FDR", fdr)) +
+  ylab(bquote(~Log[10]~ "Count of DEGs at FDR 0.1")) +
   theme_bw() +
   theme(axis.title.x = element_blank(),
         axis.text.x = element_blank(),        
@@ -440,11 +440,11 @@ ggsave(p3c_noleg, height = 6, width = 12, dpi = 300, device = "png",
 p4 <- 
   ggplot(plot_df_nona, aes(x = PercRankFC, y = log10(Count_DEG + 1), fill = Symbol)) +
   geom_jitter(size = 5, color = "black", shape = 21) +
-  ylab(paste0("log10 Count of DEGs at FDR", fdr)) +
+  ylab(bquote(~Log[10]~ "Count of DEGs at FDR 0.1")) +
   xlab("Percentile rank fold change of perturbed TR") +
   theme_classic() +
-  theme(axis.text = element_text(size = 25),
-        axis.title = element_text(size = 25),
+  theme(axis.text = element_text(size = 30),
+        axis.title = element_text(size = 35),
         legend.text = element_text(size = 25),
         legend.title = element_blank()) +
   scale_fill_manual(values = tf_pal_hg)
@@ -456,11 +456,11 @@ ggsave(p4, height = 9, width = 12, dpi = 300, device = "png",
 p5a <- 
   ggplot(plot_df_nona, aes(x = FoldChange, y = log10(Count_DEG + 1), fill = Symbol)) +
   geom_jitter(size = 5, color = "black", shape = 21) +
-  ylab(paste0("log10 Count of DEGs at FDR", fdr)) +
-  xlab("Log2 fold change of perturbed TR") +
+  ylab(bquote(~Log[10]~ "Count of DEGs at FDR 0.1")) +
+  xlab(bquote(~Log[2]~ "fold change of perturbed TR")) +
   theme_classic() +
-  theme(axis.text = element_text(size = 25),
-        axis.title = element_text(size = 25),
+  theme(axis.text = element_text(size = 30),
+        axis.title = element_text(size = 35),
         legend.text = element_text(size = 25),
         legend.title = element_blank()) +
   scale_fill_manual(values = tf_pal_hg)
@@ -468,11 +468,11 @@ p5a <-
 p5b <- 
   ggplot(plot_df_nona, aes(x = abs(FoldChange), y = log10(Count_DEG + 1), fill = Symbol)) +
   geom_jitter(size = 5, color = "black", shape = 21) +
-  ylab(paste0("log10 Count of DEGs at FDR", fdr)) +
-  xlab("Absolute log2 fold change of perturbed TR") +
+  ylab(bquote(~Log[10]~ "Count of DEGs at FDR 0.1")) +
+  xlab(bquote("Absolute" ~Log[2]~ "fold change of perturbed TR")) +
   theme_classic() +
-  theme(axis.text = element_text(size = 25),
-        axis.title = element_text(size = 25),
+  theme(axis.text = element_text(size = 30),
+        axis.title = element_text(size = 35),
         legend.text = element_text(size = 25),
         legend.title = element_blank()) +
   scale_fill_manual(values = tf_pal_hg)
@@ -499,10 +499,10 @@ fc_df$Experiment_ID <- factor(fc_df$Experiment_ID, levels = unique(fc_df$Experim
 p6a <- 
   ggplot(fc_df, aes(x = Experiment_ID, y = FoldChange, fill = Symbol)) +
   geom_boxplot(outlier.shape = NA, width = 1) +
-  geom_hline(yintercept = c(-1, 1), color = "red", size = 1.5) +
+  geom_hline(yintercept = c(-1, 1), color = "red", linewidth = 1.5) +
   theme_classic() +
   ylim(-3, 3) +
-  ylab("Log2 fold change") +
+  ylab(bquote(~Log[2]~ "fold change")) +
   xlab("TR perturbation experiments") +
   theme(axis.text.x = element_blank(),
         axis.ticks.x = element_blank(),
@@ -527,7 +527,7 @@ ggsave(p6b, height = 6, width = 12, dpi = 300, device = "png",
 p7a <- pert_df %>% 
   ggplot(., aes(x = Perturbation, y = log10(Count_DEG + 1))) +
   geom_boxplot(width = 0.4, fill = "turquoise4") +
-  ylab(paste0("log10 Count of DEGs at FDR", fdr)) +
+  ylab(bquote(~Log[10]~ "Count of DEGs at FDR 0.1")) +
   # ggtitle("All experiments") +
   theme_classic() +
     theme(axis.title.x = element_blank(),
@@ -540,7 +540,7 @@ p7b <- pert_df %>%
   filter(Count_DEG > 0) %>% 
   ggplot(., aes(x = Perturbation, y = log10(Count_DEG + 1))) +
   geom_boxplot(width = 0.4, fill = "turquoise4") +
-  ylab(paste0("log10 Count of DEGs at FDR", fdr)) +
+  ylab(bquote(~Log[10]~ "Count of DEGs at FDR 0.1")) +
   # ggtitle("Excluding experiments with 0 DEGs") +
   theme_classic() +
   theme(axis.title.x = element_blank(),
