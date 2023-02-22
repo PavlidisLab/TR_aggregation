@@ -9,16 +9,20 @@ source("R/setup-01_config.R")
 
 # Be aware of date of latest update! https://github.com/inutano/chip-atlas/wiki
 # Last update: August 2020 (checked May2022, still same)
-date <- "aug2020"
+ca_date <- "aug2020"
 
-
-meta_name <- paste0("chipatlas_all_meta_", date, ".tsv")
-outdir <- paste0(meta_dir, "Chipseq/Chipatlas/")
-meta_path <- paste0(outdir, meta_name)
+# Chip Atlas download URL
 url <- "http://dbarchive.biosciencedbc.jp/kyushu-u/metadata/experimentList.tab"
 
-mouse_tfs <- read.delim("~/Data/Metadata/mouse_tfs.tsv", stringsAsFactors = FALSE)
-human_tfs <- read.delim("~/Data/Metadata/human_tfs.tsv", stringsAsFactors = FALSE)
+# Output
+out_dir <- file.path(meta_dir, "Chipseq", "Chipatlas")
+meta_path <- file.path(out_dir, paste0("chipatlas_all_meta_", ca_date, ".tsv"))
+
+# List of TFs to subset meta
+tf_mm <- read.delim(tf_path_mm, stringsAsFactors = FALSE)
+tf_hg <- read.delim(tf_path_hg, stringsAsFactors = FALSE)
+
+# Download all chip atlas metadata
 
 if (!file.exists(meta_path)) {
   download.file(url, meta_path)
@@ -57,7 +61,7 @@ antibody <- parallel::mclapply(1:nrow(all_meta_clean), function(x) {
   match_text <- str_extract(all_meta_clean[x, 10:nfields], ".*antibody.*")
   match_text <- paste(na.omit(match_text), collapse = " | ")
   ifelse(match_text == "", NA, match_text)
-}, mc.cores = 8)
+}, mc.cores = cores)
 
 
 # Split the compressed QC columns
@@ -93,33 +97,38 @@ colnames(all_meta_clean_subset) <-
     "CA_Peak_Count"
   )
 
-# Chip-Atlas uses mm9/hg19. Pipeline uses mm10/hg38. Generalizing to species
-mouse_all_meta <- filter(all_meta_clean_subset, Species == "mm9")
-mouse_all_meta$Species <- "Mouse"
 
-human_all_meta <- filter(all_meta_clean_subset, Species == "hg19")
-human_all_meta$Species <- "Human"
+# Chip-Atlas uses mm9/hg19. Pipeline uses mm10/hg38. Generalizing to species
+
+all_meta_mm <- filter(all_meta_clean_subset, Species == "mm9")
+all_meta_mm$Species <- "Mouse"
+
+all_meta_hg <- filter(all_meta_clean_subset, Species == "hg19")
+all_meta_hg$Species <- "Human"
 
 
 # Separate input and ChIP meta
-mouse_input_meta <- filter(mouse_all_meta, Antigen_Class == "Input control")
-mouse_tf_meta <- filter(mouse_all_meta, Antigen_Class == "TFs and others")
 
-human_input_meta <- filter(human_all_meta, Antigen_Class == "Input control")
-human_tf_meta <- filter(human_all_meta, Antigen_Class == "TFs and others")
+input_meta_mm <- filter(all_meta_mm, Antigen_Class == "Input control")
+tf_meta_mm <- filter(all_meta_mm, Antigen_Class == "TFs and others")
+
+input_meta_hg <- filter(all_meta_hg, Antigen_Class == "Input control")
+tf_meta_hg <- filter(all_meta_hg, Antigen_Class == "TFs and others")
 
 
-# Restrict to known TFs
-mouse_tf_meta <- filter(mouse_tf_meta, Symbol %in% mouse_tfs$Symbol)
-human_tf_meta <- filter(human_tf_meta, Symbol %in% human_tfs$Symbol)
+# Restrict to TFs 
 
-# save out metadata
+tf_meta_mm <- filter(tf_meta_mm, Symbol %in% tf_mm$Symbol)
+tf_meta_hg <- filter(tf_meta_hg, Symbol %in% tf_hg$Symbol)
+
+
+# Save out metadata
 
 table_list <- list(
-  human_tf_meta,
-  human_input_meta,
-  mouse_tf_meta,
-  mouse_input_meta
+  tf_meta_hg,
+  input_meta_hg,
+  tf_meta_mm,
+  input_meta_mm
 )
 
 table_names <-  c(
@@ -136,6 +145,6 @@ for (i in 1:length(table_list)) {
     sep = "\t",
     row.names = FALSE,
     na = "NA",
-    file = paste0(outdir, table_names[i], date, ".tsv")
+    file = file.path(out_dir, paste0(table_names[i], ca_date, ".tsv"))
   )
 }
