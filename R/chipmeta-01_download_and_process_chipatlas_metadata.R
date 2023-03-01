@@ -1,10 +1,11 @@
-## Download and organize relevant information from Chip Atlas's ChIP-seq meta
-## sheet. Only want to keep TF data sets in mouse and human. The downloaded table
-## then undergoes additional manual curation to verify details, match inputs, and
-## add additional experiments from other databases.
+## Download and format Chip Atlas's ChIP-seq metadata.
+## Only want to keep TF data sets in mouse and human. The downloaded table
+## then undergoes additional manual curation to verify details, match inputs, 
+## and add additional experiments from other databases.
 ## -----------------------------------------------------------------------------
 
 library(tidyverse)
+library(parallel)
 source("R/setup-01_config.R")
 
 # Be aware of date of latest update! https://github.com/inutano/chip-atlas/wiki
@@ -22,7 +23,10 @@ meta_path <- file.path(out_dir, paste0("chipatlas_all_meta_", ca_date, ".tsv"))
 tf_mm <- read.delim(tf_path_mm, stringsAsFactors = FALSE)
 tf_hg <- read.delim(tf_path_hg, stringsAsFactors = FALSE)
 
+
 # Download all chip atlas metadata
+# -----------------------------------------------------------------------------
+
 
 if (!file.exists(meta_path)) {
   download.file(url, meta_path)
@@ -30,12 +34,12 @@ if (!file.exists(meta_path)) {
 
 assertthat::is.readable(meta_path)
 
-# The table has a lot of empty elements - need to get field count. After loading
-# inspect for column names.
+
+# The table has a lot of empty elements - need to get field count. 
 
 nfields <- max(count.fields(meta_path, sep = "\t"), na.rm = TRUE)
 
-all_meta <- read.delim(
+meta_all <- read.delim(
   meta_path,
   col.names = 1:nfields,
   quote = "",
@@ -43,11 +47,16 @@ all_meta <- read.delim(
   stringsAsFactors = FALSE
 )
 
-dim(all_meta) # aug2020: 439593    131
+dim(meta_all) # aug2020: 439593    131
 
-# only want mouse and human for input and TF ChIP experiments
 
-all_meta_clean <- all_meta %>%
+# Format. Note that the following assumes fixed columns, so inspect!
+# -----------------------------------------------------------------------------
+
+
+# Only want mouse and human for input and TF ChIP experiments
+
+meta_all_clean <- meta_all %>%
   filter(X2 %in% c("mm9", "hg19") &
            X3 %in% c("Input control", "TFs and others"))
 
@@ -56,31 +65,38 @@ all_meta_clean <- all_meta %>%
 # page - variable in presence, naming, and position. Looking for any mention
 # of antibody for later curation.
 
+get_antibody <- function(meta, ncores = cores) {
+  
+  antibody <- mclapply(1:nrow(meta), function(x) {
+    match_text <- str_extract(meta[x, 10:ncol(meta)], ".*antibody.*")
+    match_text <- paste(na.omit(match_text), collapse = " | ")
+    ifelse(match_text == "", NA, match_text)
+  }, mc.cores = ncores)
 
-antibody <- parallel::mclapply(1:nrow(all_meta_clean), function(x) {
-  match_text <- str_extract(all_meta_clean[x, 10:nfields], ".*antibody.*")
-  match_text <- paste(na.omit(match_text), collapse = " | ")
-  ifelse(match_text == "", NA, match_text)
-}, mc.cores = cores)
+  return(unlist(antibody)) 
+}
 
 
-# Split the compressed QC columns
+antibody <- get_antibody(meta_all_clean)
 
-qc_cols <- str_split_fixed(all_meta_clean[, "X8"], ",", 4)
+
+# Split the compressed QC columns (nReads, % mapped", % duplicated, nPeaks)
+
+qc_cols <- str_split_fixed(meta_all_clean[, "X8"], ",", 4)
 
 # Keep main columns and add antibody/QC
 
-all_meta_clean_subset <- all_meta_clean[ , c(1:7, 9)]
-all_meta_clean_subset <- cbind(all_meta_clean_subset, unlist(antibody), qc_cols)
+meta_all_clean_subset <- meta_all_clean[ , c(1:7, 9)]
+meta_all_clean_subset <- cbind(meta_all_clean_subset, unlist(antibody), qc_cols)
 
 # Set names
 
-if (!all(unique(all_meta_clean$X2) %in% c("hg19", "mm9"))) {
+if (!all(unique(meta_all_clean$X2) %in% c("hg19", "mm9"))) {
   warning("double check column names are in order!")
 }
 
 
-colnames(all_meta_clean_subset) <-
+colnames(meta_all_clean_subset) <-
   c(
     "ID",
     "Species",
@@ -100,35 +116,35 @@ colnames(all_meta_clean_subset) <-
 
 # Chip-Atlas uses mm9/hg19. Pipeline uses mm10/hg38. Generalizing to species
 
-all_meta_mm <- filter(all_meta_clean_subset, Species == "mm9")
-all_meta_mm$Species <- "Mouse"
+meta_all_mm <- filter(meta_all_clean_subset, Species == "mm9")
+meta_all_mm$Species <- "Mouse"
 
-all_meta_hg <- filter(all_meta_clean_subset, Species == "hg19")
-all_meta_hg$Species <- "Human"
+meta_all_hg <- filter(meta_all_clean_subset, Species == "hg19")
+meta_all_hg$Species <- "Human"
 
 
 # Separate input and ChIP meta
 
-input_meta_mm <- filter(all_meta_mm, Antigen_Class == "Input control")
-tf_meta_mm <- filter(all_meta_mm, Antigen_Class == "TFs and others")
+meta_input_mm <- filter(meta_all_mm, Antigen_Class == "Input control")
+meta_tf_mm <- filter(meta_all_mm, Antigen_Class == "TFs and others")
 
-input_meta_hg <- filter(all_meta_hg, Antigen_Class == "Input control")
-tf_meta_hg <- filter(all_meta_hg, Antigen_Class == "TFs and others")
+meta_input_hg <- filter(meta_all_hg, Antigen_Class == "Input control")
+meta_tf_hg <- filter(meta_all_hg, Antigen_Class == "TFs and others")
 
 
 # Restrict to TFs 
 
-tf_meta_mm <- filter(tf_meta_mm, Symbol %in% tf_mm$Symbol)
-tf_meta_hg <- filter(tf_meta_hg, Symbol %in% tf_hg$Symbol)
+meta_tf_mm <- filter(meta_tf_mm, Symbol %in% tf_mm$Symbol)
+meta_tf_hg <- filter(meta_tf_hg, Symbol %in% tf_hg$Symbol)
 
 
 # Save out metadata
 
 table_list <- list(
-  tf_meta_hg,
-  input_meta_hg,
-  tf_meta_mm,
-  input_meta_mm
+  meta_tf_hg,
+  meta_input_hg,
+  meta_tf_mm,
+  meta_input_mm
 )
 
 table_names <-  c(
