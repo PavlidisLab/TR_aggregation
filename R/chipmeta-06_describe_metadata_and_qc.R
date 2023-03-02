@@ -12,9 +12,9 @@ plot_dir <- file.path(cplot_dir, "Describe_meta/")
 # meta final is what is used for analysis - filtered for min peaks and passing IDR/overlap
 # meta runs is all completed runs (including those under min peak) - used for plotting
 # meta all is all samples (row per sample) including those failing IDR/overlap
-meta_final <- read.delim(paste0(meta_dir, "Chipseq/batch1_chip_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
-meta_runs <- read.delim(paste0(meta_dir, "Chipseq/batch1_chip_meta_completed_withqc_", date, ".tsv"), stringsAsFactors = FALSE)
-meta_all <- read.delim(paste0(meta_dir, "Chipseq/batch1_chip_meta_all_", date, ".tsv"), stringsAsFactors = FALSE)
+meta_final <- read.delim(chip_meta_path)
+meta_run <- read.delim(file.path(meta_dir, "Chipseq", paste0("batch1_chip_meta_completed_withqc_", date, ".tsv")), stringsAsFactors = FALSE)
+meta_sample <- read.delim(file.path(meta_dir, "Chipseq", paste0("batch1_chip_meta_all_", date, ".tsv")), stringsAsFactors = FALSE)
 
 
 # Describe metadata
@@ -60,7 +60,7 @@ summary(runs_per_geo)
 
 # Failures for TF/non-Mecp2
 
-meta_all %>% 
+meta_sample %>% 
   filter(Complete != "1" & str_to_upper(Symbol) != "MECP2") %>% 
   distinct(Experiment_ID, .keep_all = TRUE) %>% 
   dplyr::count(Complete)
@@ -68,7 +68,7 @@ meta_all %>%
 
 # Failures for Mecp2 histone mode
 
-meta_all %>% 
+meta_sample %>% 
   filter(Complete != "1" & str_to_upper(Symbol) == "MECP2") %>% 
   filter(str_detect(Experiment_ID, "HISTONE")) %>% 
   distinct(Experiment_ID, .keep_all = TRUE) %>% 
@@ -201,7 +201,7 @@ ggsave(p2b, dpi = 300, device = "png", height = 10, width = 12,
 
 
 # Counts of peaks as jitter plots with median bars, grouped by TR or presence of input.
-# Note use of meta_runs, which includes experiments that were ultimately filtered
+# Note use of meta_run, which includes experiments that were ultimately filtered
 
 
 plot_jitter_median <- function(df, xvar, yvar, ylab, hline = NULL) {
@@ -226,7 +226,7 @@ plot_jitter_median <- function(df, xvar, yvar, ylab, hline = NULL) {
 
 # overlap counts ~  symbol 
 
-p3a <- meta_runs %>% 
+p3a <- meta_run %>% 
   dplyr::mutate(Symbol = str_to_upper(Symbol),
                 Peaks = log10(N_overlap_peaks)) %>% 
   plot_jitter_median(ylab = bquote(~Log[10]~ "count of overlap peaks"),
@@ -238,7 +238,7 @@ ggsave(p3a, dpi = 300, device = "png", height = 8, width = 12,
 
 # IDR counts
 
-p3b <- meta_runs %>% 
+p3b <- meta_run %>% 
   dplyr::mutate(Symbol = str_to_upper(Symbol),
          Peaks = log10(N_IDR_peaks)) %>% 
   plot_jitter_median(ylab = bquote(~Log[10]~ "count of IDR peaks"),
@@ -250,7 +250,7 @@ ggsave(p3b, dpi = 300, device = "png", height = 8, width = 12,
 
 # overlap for mecp2, IDR for TF (this is what is used in the paper)
 
-p3c <- meta_runs %>% 
+p3c <- meta_run %>% 
   dplyr::mutate(Symbol = str_to_upper(Symbol),
          Peaks = log10(N_peaks)) %>% 
   plot_jitter_median(ylab = bquote(~Log[10]~ "count of reproducible peaks"),

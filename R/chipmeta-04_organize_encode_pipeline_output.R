@@ -13,24 +13,24 @@ library(rjson)
 source("R/setup-01_config.R")
 
 # the root dir where the output of the pipeline lives
-chip_dir <- paste0(pipeout_dir, "chip/")
+chip_dir <- file.path(pipeout_dir, "chip")
 
 # Output paths of the various tables that are generated:
 
 # table that links qc.jsons to experiment IDs for input to the qc2tsv tool
-qc_out <- paste0(pipeout_dir, "qc_reports/batch1_qcfiles_", date, ".txt")
+qc_out <- file.path(pipeout_dir, "qc_reports", paste0("batch1_qcfiles_", date, ".txt"))
 
 # table associating experiment IDs to its corresponding output directory
-run_dir_output <- paste0(meta_dir, "Chipseq/batch1_run_dirs_", date, ".tsv")
+run_dir_output <- file.path(meta_dir, "Chipseq", paste0("batch1_run_dirs_", date, ".tsv"))
 
 # output metadata of all processed ChIP-seq samples
-meta_all_output <- paste0(meta_dir, "Chipseq/batch1_chip_meta_all_", date, ".tsv")
+meta_sample_output <- file.path(meta_dir, "Chipseq", paste0("batch1_chip_meta_all_", date, ".tsv"))
 
-# output metadata of all processed ChIP-seq experiments
-meta_distinct_output <- paste0(meta_dir, "Chipseq/batch1_chip_meta_completed_runs_", date, ".tsv")
+# output metadata of all processed ChIP-seq experiments/runs
+meta_run_output <- file.path(meta_dir, "Chipseq", paste0("batch1_chip_meta_completed_runs_", date, ".tsv"))
 
 # Output of curated GEO/lab groups for each ChIP-seq experiment
-geo_group_output <- paste0(meta_dir, "Chipseq/batch1_chip_geo_groups_", date, ".tsv")
+geo_group_output <- file.path(meta_dir, "Chipseq", paste0("batch1_chip_geo_groups_", date, ".tsv"))
 
 
 # Load and clean metadata
@@ -109,10 +109,10 @@ stopifnot(identical(
 # ------------------------------------------------------------------------------
 
 
+# Ensures that the SRX IDs associated in the pathing of the ENCODE
+# run meta json match the SRX IDs in curated ChIP-seq meta. Returns T/F
+
 check_meta <- function(run_meta, chip_meta = meta_all) {
-  
-  # Ensures that the SRX IDs associated in the pathing of the ENCODE
-  # run meta json match the SRX IDs in curated ChIP-seq meta. Returns T/F
   
   ctl <- unlist(run_meta$inputs[str_detect(names(run_meta$inputs), "chip.ctl")])
   ctl <- unique(unlist(str_extract_all(ctl, "SRX[:digit:]+")))
@@ -128,12 +128,11 @@ check_meta <- function(run_meta, chip_meta = meta_all) {
 }
 
 
+# Given a directory output from the ENCODE pipeline, load the metadata json
+# file to extract the run title/experiment ID, then check for presence of 
+# peak dir and QC json
 
 get_run_info <- function(dir) {
-  
-  # Given a directory output from the ENCODE pipeline, load the metadata json
-  # file to extract the run title/experiment ID, then check for presence of 
-  # peak dir and QC json
   
   df <- data.frame(Experiment_ID = NA,
                    Dir = dir, 
@@ -247,7 +246,6 @@ meta_idr_fail <- meta %>%
 stopifnot(meta_idr_fail$Experiment_ID %in% idr_fail)
 
 
-
 # Organize QC file locations for input into the ENCODE qc2tsv tool
 # ------------------------------------------------------------------------------
 
@@ -259,8 +257,10 @@ qc_df <- run_info %>%
 
 
 
-# Save out Gsheets for curating GEO groups (used as blocking variable for bind
-# scores). Load curated sheet back to save locally 
+# Save out Gsheets for curating GEO groups, used as blocking variable for bind
+# scores. Load curated sheet back to save locally 
+# 'GEO_Group_Bin' groups all experiments (regardless of TR) if same lab.
+# 'GEO_Group' only groups same TR + same lab.
 
 
 geo_dup <- meta_distinct %>% 
@@ -300,7 +300,7 @@ write.table(
   row.names = FALSE,
   col.names = TRUE,
   sep = "\t",
-  file = meta_all_output
+  file = meta_sample_output
 )
 
 
@@ -310,7 +310,7 @@ write.table(
   row.names = FALSE,
   col.names = TRUE,
   sep = "\t",
-  file = meta_distinct_output
+  file = meta_run_output
 )
 
 

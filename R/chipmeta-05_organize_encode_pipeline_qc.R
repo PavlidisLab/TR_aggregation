@@ -1,28 +1,28 @@
-## This script organizes and saves two tables from the ENCODE pipeline qc2tsv 
-## output.The first table cleans/organizes selected stats which are output by 
-## sample. The second averages these stats for samples within a run, and adds 
-## additional information about that run/experiment (count of peaks, number of 
-## samples) and merges it with the curated metadata.
+## This script organizes and saves two tables from the ENCODE qc2tsv output.
+## 1) Sample level QC stats for a subset of selected stats
+## 2) Experiment level QC that averages sample stats and adds further exp info.
+## The experiment level QC is merged with the curated metadata.
 ## -----------------------------------------------------------------------------
 
 library(tidyverse)
 source("R/setup-01_config.R")
 
 # The raw output of the qc2tsv tool
-qc_input <- paste0(pipeout_dir, "qc_reports/", date, "_chip_qc_report.tsv")
+qc_input <- file.path(pipeout_dir, "qc_reports", paste0(date, "_chip_qc_report.tsv"))
 
 # Cleaned QC info for all samples
-qc_sample_output <- paste0("~/Data/Metadata/Chipseq/batch1_clean_sample_qc_", date, ".tsv")
+qc_sample_output <- file.path(meta_dir, "Chipseq", paste0("batch1_clean_sample_qc_", date, ".tsv"))
 
 # Cleaned QC info at the experiment level (samples averaged)
-qc_run_output <- paste0("~/Data/Metadata/Chipseq/batch1_chip_meta_completed_withqc_", date, ".tsv")
+qc_run_output <- file.path(meta_dir, "Chipseq", paste0("batch1_chip_meta_completed_withqc_", date, ".tsv"))
 
 # The final metadata that includes completed experiments with their QC metrics
-meta_final_output <- paste0("~/Data/Metadata/Chipseq/batch1_chip_meta_final_", date, ".tsv")
+meta_final_output <- file.path(meta_dir, "Chipseq", paste0("batch1_chip_meta_final_", date, ".tsv"))
+stopifnot(identical(chip_meta_path, meta_final_output)) # declared in config
 
-# The metadata tables before adding the QC metrics
-meta_all <- read.delim(paste0("~/Data/Metadata/Chipseq/batch1_chip_meta_all_", date, ".tsv"), stringsAsFactors = FALSE)
-meta_distinct <- read.delim(paste0("~/Data/Metadata/Chipseq/batch1_chip_meta_completed_runs_", date, ".tsv"), stringsAsFactors = FALSE)
+# Metadata before adding the QC metrics at the sample or experiment/run level
+meta_sample <- read.delim(file.path(meta_dir, "Chipseq", paste0("batch1_chip_meta_all_", date, ".tsv")), stringsAsFactors = FALSE)
+meta_run <- read.delim(file.path(meta_dir, "Chipseq", paste0("batch1_chip_meta_completed_runs_", date, ".tsv")), stringsAsFactors = FALSE)
 
 
 # Reminder - current imp doesn't auto run qc2tsv after chipmeta-04
@@ -179,11 +179,11 @@ qc_samples <-
 
 # Sample counts within an experiment 
 
-samps_per_run <- meta_all %>% 
+samps_per_run <- meta_sample %>% 
   group_by(Experiment_ID) %>% 
   dplyr::summarise(Count_samples = n())
 
-input_per_run <- meta_all %>%
+input_per_run <- meta_sample %>%
   group_by(Experiment_ID) %>%
   dplyr::summarise(Count_input = sum(!is.na(unique(unlist(str_split(Input_ID, ", "))))))
 
@@ -251,7 +251,7 @@ rsc <-  qc_samples %>%
 
 # join back together for run-level QC
 qc_run <- Reduce(function(...) merge(..., by = "Experiment_ID", all.x = TRUE), 
-                 list(meta_distinct,
+                 list(meta_run,
                       peaks,
                       exp_reads, 
                       input_reads,
