@@ -8,11 +8,9 @@ library(parallel)
 source("R/setup-01_config.R")
 source("R/utils/range_table_functions.R")
 
-pipeline_dir <- paste0(pipeout_dir, "chip/")
-
 # Load metadata and link IDs to their corresponding directory
-run_ids <- read.delim(paste0(meta_dir, "Chipseq/batch1_run_dirs_", date, ".tsv"), stringsAsFactors = FALSE)
-meta <- read.delim(paste0(meta_dir, "Chipseq/batch1_chip_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
+run_ids <- read.delim(chip_run_path, stringsAsFactors = FALSE)
+meta <- read.delim(chip_meta_path, stringsAsFactors = FALSE)
 
 stopifnot(all(meta$Experiment_ID %in% run_ids$Experiment_ID))
 stopifnot(!any(run_ids$Dir == "" | is.na(run_ids$Dir)))
@@ -22,9 +20,9 @@ ids_hg <- run_ids[run_ids$Species == "Human", ]
 ids_mm <- run_ids[run_ids$Species == "Mouse", ]
 
 # Load protein coding tables for gene annotation
-pc_hg <- read.delim(paste0(meta_dir, "refseq_select_hg38.tsv"), stringsAsFactors = FALSE)
-pc_mm <- read.delim(paste0(meta_dir, "refseq_select_mm10.tsv"), stringsAsFactors = FALSE)
-pc_ortho <- read.delim(paste0(meta_dir, "hg_mm_1to1_ortho_genes_DIOPT-v8.tsv"), stringsAsFactors = FALSE)
+pc_hg <- read.delim(ref_path_hg, stringsAsFactors = FALSE)
+pc_mm <- read.delim(ref_path_mm, stringsAsFactors = FALSE)
+pc_ortho <- read.delim(ortho_path, stringsAsFactors = FALSE)
 
 # Remove duplicated pseudoautosomal genes in human (keep X copy)
 dupl <- pc_hg$Symbol[duplicated(pc_hg$Symbol)]
@@ -119,17 +117,17 @@ stopifnot(identical(
 
 saveRDS(
   object = mat_hg,
-  file = paste0(cmat_dir, "ouyang_refseq_human_batch1_", date, "_", "dc=5000_intensity=FALSE.RDS")
+  file = bsmat_hg_path
 )
 
 
 saveRDS(
   object = mat_mm,
-  file = paste0(cmat_dir, "ouyang_refseq_mouse_batch1_", date, "_", "dc=5000_intensity=FALSE.RDS")
+  file = bsmat_mm_path
 )
 
 
 saveRDS(
   object = mat_ortho,
-  file = paste0(cmat_dir, "ouyang_refseq_ortho_batch1_", date, "_", "dc=5000_intensity=FALSE.RDS")
+  file = bsmat_ortho_path
 )

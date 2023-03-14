@@ -13,14 +13,13 @@ source("R/utils/plot_functions.R")
 
 topn <- 500 # how many of the top genes to keep
 plot_dir <- file.path(cplot_dir, "Binding_similarity/")
-outfile <- paste0(scratch_dir, date, "_chip_similarity_refseq.RDS")
 
 # Loading ChIP-seq data
 chip_type <- "QN_log"  # which chip processing scheme to use
-meta <- read.delim(paste0(meta_dir, "Chipseq/batch1_chip_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
-chip_hg <- readRDS(paste0(cmat_dir, "Human_refseq_", date, "_processed_bindmat_list_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=FALSE_binary=", binary_dist/1e3, "kb.RDS"))
-chip_mm <- readRDS(paste0(cmat_dir, "Mouse_refseq_", date, "_processed_bindmat_list_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=FALSE_binary=", binary_dist/1e3, "kb.RDS"))
-chip_ortho <- readRDS(paste0(cmat_dir, "Ortho_refseq_", date, "_processed_bindmat_list_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=FALSE_binary=", binary_dist/1e3, "kb.RDS"))
+meta <- read.delim(chip_meta_path, stringsAsFactors = FALSE)
+chip_hg <- readRDS(blist_hg_path)
+chip_mm <- readRDS(blist_mm_path)
+chip_ortho <- readRDS(blist_ortho_path)
 
 
 # General workflow is to generate exp x exp matrices where elements represent
@@ -37,7 +36,7 @@ chip_ortho <- readRDS(paste0(cmat_dir, "Ortho_refseq_", date, "_processed_bindma
 # NOTE: slow! get_overlap_matrices needs to be sped up
 
 
-if (!file.exists(outfile)) {
+if (!file.exists(chip_sim_path)) {
   
   sim_list <- list(
     Human = chip_sim_list(chip_hg[[chip_type]], topn),
@@ -46,11 +45,11 @@ if (!file.exists(outfile)) {
   
   df_list <- lapply(sim_list, format_and_merge)
   
-  saveRDS(list(sim_list = sim_list, df_list = df_list), file = outfile)
+  saveRDS(list(sim_list = sim_list, df_list = df_list), file = chip_sim_path)
   
 } else {
   
-  dat <- readRDS(outfile)
+  dat <- readRDS(chip_sim_path)
   df_list <- dat$df_list
   sim_list <- dat$sim_list
   rm(dat)

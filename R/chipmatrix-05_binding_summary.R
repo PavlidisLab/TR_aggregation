@@ -14,22 +14,21 @@ library(GeneOverlap)
 source("R/setup-01_config.R")
 source("R/utils/plot_functions.R")
 
-plot_dir <- paste0(cplot_dir, "Binding_summary/")
-outfile <- paste0(scratch_dir, date, "_refseq_bind_summary.RDS")
+plot_dir <- file.path(cplot_dir, "Binding_summary/")
 
 # Loading ChIP-seq data
 chip_type <- "QN_log"  # which chip processing scheme to use
-meta <- read.delim(paste0(meta_dir, "Chipseq/batch1_chip_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
-chip_hg <- readRDS(paste0(cmat_dir, "Human_refseq_", date, "_processed_bindmat_list_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=FALSE_binary=", binary_dist/1e3, "kb.RDS"))
-chip_mm <- readRDS(paste0(cmat_dir, "Mouse_refseq_", date, "_processed_bindmat_list_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=FALSE_binary=", binary_dist/1e3, "kb.RDS"))
-chip_ortho <- readRDS(paste0(cmat_dir, "Ortho_refseq_", date, "_processed_bindmat_list_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=FALSE_binary=", binary_dist/1e3, "kb.RDS"))
+meta <- read.delim(chip_meta_path, stringsAsFactors = FALSE)
+chip_hg <- readRDS(blist_hg_path)
+chip_mm <- readRDS(blist_mm_path)
+chip_ortho <- readRDS(blist_ortho_path)
 stopifnot(all(colnames(chip_ortho$Raw) %in% meta$Experiment_ID))
 
 # Curated GEO groups for blocking variable in the model
 geo_groups <- read.delim(paste0(meta_dir, "Chipseq/batch1_chip_geo_groups_", date, ".tsv"), stringsAsFactors = FALSE)
 
 # Ortho genes
-pc_ortho <- read.delim(paste0(meta_dir, "hg_mm_1to1_ortho_genes_DIOPT-v8.tsv"), stringsAsFactors = FALSE)
+pc_ortho <- read.delim(ortho_path, stringsAsFactors = FALSE)
 
 
 # Formatting meta for linear model + join GEO groups
@@ -539,7 +538,7 @@ saveRDS(
     Ortho_bind_all = bind_all$Ortho,
     Ortho_bind_tf = bind_tf$Ortho
   ),
-  file = outfile
+  file = bind_summary_path
 )
 
 

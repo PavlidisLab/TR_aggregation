@@ -8,19 +8,21 @@ library(scales)
 library(cowplot)
 source("R/setup-01_config.R")
 
-plot_dir <- paste0(cplot_dir, "Preprocess/")
+plot_dir <- file.path(cplot_dir, "Preprocess")
 
 # ChIP-seq meta and QC info
-meta <- read.delim(paste0(meta_dir, "Chipseq/batch1_chip_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
+meta <- read.delim(chip_meta_path, stringsAsFactors = FALSE)
 
 # binmat = binary matrix based on distance thresholds.
+binmat_hg <- readRDS(binmat_hg_path)
+binmat_mm <- readRDS(binmat_mm_path)
+binmat_ortho <- readRDS(binmat_ortho_path)
+
 # bsmat = binding score matrix
-binmat_hg <- readRDS(paste0(cmat_dir, "binary_refseq_human_batch1_", date, "_", "distance=", binary_dist/1e3, "kb.RDS"))
-binmat_mm <- readRDS(paste0(cmat_dir, "binary_refseq_mouse_batch1_", date, "_", "distance=", binary_dist/1e3, "kb.RDS"))
-binmat_ortho <- readRDS(paste0(cmat_dir, "binary_refseq_ortho_batch1_", date, "_", "distance=", binary_dist/1e3, "kb.RDS"))
-bsmat_hg <- readRDS(paste0(cmat_dir, "ouyang_refseq_human_batch1_", date, "_", "dc=5000_intensity=FALSE.RDS"))
-bsmat_mm <- readRDS(paste0(cmat_dir, "ouyang_refseq_mouse_batch1_", date, "_", "dc=5000_intensity=FALSE.RDS"))
-bsmat_ortho <- readRDS(paste0(cmat_dir, "ouyang_refseq_ortho_batch1_", date, "_", "dc=5000_intensity=FALSE.RDS"))
+bsmat_hg <- readRDS(bsmat_hg_path)
+bsmat_mm <- readRDS(bsmat_mm_path)
+bsmat_ortho <- readRDS(bsmat_ortho_path)
+
 
 bs_list <- list("Human" = bsmat_hg,
                 "Mouse" = bsmat_mm,
@@ -166,12 +168,9 @@ bs_norm_mm$Binary <- bin_filt$Mouse
 bs_norm_ortho$Binary <- bin_filt$Ortho
 
 
-saveRDS(bs_norm_hg, 
-        file = paste0(cmat_dir, "Human_refseq_", date, "_processed_bindmat_list_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=FALSE_binary=", binary_dist/1e3, "kb.RDS"))
-saveRDS(bs_norm_mm, 
-        file = paste0(cmat_dir, "Mouse_refseq_", date, "_processed_bindmat_list_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=FALSE_binary=", binary_dist/1e3, "kb.RDS"))
-saveRDS(bs_norm_ortho, 
-        file = paste0(cmat_dir, "Ortho_refseq_", date, "_processed_bindmat_list_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=FALSE_binary=", binary_dist/1e3, "kb.RDS"))
+saveRDS(bs_norm_hg, file = blist_hg_path)
+saveRDS(bs_norm_mm, blist_mm_path)
+saveRDS(bs_norm_ortho, blist_ortho_path)
 
 
 # Plots
@@ -193,7 +192,7 @@ p1 <-
         axis.text = element_text(size = 15))
 
 ggsave(p1, device = "png", dpi = 300, height = 6, width = 8,
-       filename = paste0(plot_dir, "hist_count_minpeak=", min_peaks, ".png"))
+       filename = file.path(plot_dir, paste0("hist_count_minpeak=", min_peaks, ".png")))
 
 
 # Scatter of peak counts with count of binary gene assignments
@@ -216,7 +215,7 @@ p2 <-
         axis.text = element_text(size = 15))
 
 ggsave(p2, device = "png", dpi = 300, height = 6, width = 8,
-       filename = paste0(plot_dir, "ortho_peaks_vs_binary_genes_", binary_dist/1e3, "kb_minpeak=", min_peaks, ".png"))
+       filename = file.path(plot_dir, paste0("ortho_peaks_vs_binary_genes_", binary_dist/1e3, "kb_minpeak=", min_peaks, ".png")))
 
 
 # Density plots of gene/row sums of raw+log+binary binding scores before filtering
@@ -264,7 +263,7 @@ p3 <- plot_grid(plist1$Human, plist2$Human, plist3$Human,
                 nrow = 3)
 
 ggsave(p3, device = "png", dpi = 300, height = 9, width = 12,
-       filename = paste0(plot_dir, "genewise_rowsum_bind_density_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=FALSE_binary=", binary_dist/1e3, "kb.png"))
+       filename = file.path(plot_dir, paste0("genewise_rowsum_bind_density_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=FALSE_binary=", binary_dist/1e3, "kb.png")))
 
 
 
@@ -309,7 +308,7 @@ names(plist6) <- names(bs_norm_ortho)
 for (i in 1:length(plist4)) {
   pi <- plot_grid(plist4[[i]], plist5[[i]], plist6[[i]], nrow = 1)
   ggsave(pi, device = "png", dpi = 300, height = 6, width = 12,
-         filename = paste0(plot_dir, "experimentwise_bind_density_norm=", names(bs_norm_ortho)[i], "_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=FALSE_binary=", binary_dist/1e3, "kb.png"))
+         filename = file.path(plot_dir, paste0("experimentwise_bind_density_norm=", names(bs_norm_ortho)[i], "_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=FALSE_binary=", binary_dist/1e3, "kb.png")))
 }
 
 
