@@ -7,8 +7,8 @@ source("R/setup-01_config.R")
 source("R/utils/range_table_functions.R")
 
 # batch 1 ChIP-seq meta and directories of peak files
-run_ids <- read.delim(paste0(meta_dir, "Chipseq/batch1_run_dirs_", date, ".tsv"), stringsAsFactors = FALSE)
-meta <- read.delim(paste0(meta_dir, "Chipseq/batch1_chip_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
+run_ids <- read.delim(chip_run_path, stringsAsFactors = FALSE)
+meta <- read.delim(chip_meta_path, stringsAsFactors = FALSE)
 stopifnot(all(meta$Experiment_ID %in% run_ids$Experiment_ID))
 
 # Load ENCODE blacklists and convert to GRanges
@@ -63,10 +63,10 @@ load_gr_list <- function(id_df, bl_gr, peakset = "idr") {
 
 
 # Human
-gr_hg <- load_gr_list(id_df = ids_hg, bl_gr = bl_gr_hg)
+gr_hg <- load_gr_list(id_df = ids_hg, bl_gr = bl_hg)
 
 # Mouse
-gr_mm <- load_gr_list(id_df = ids_mm, bl_gr = bl_gr_mm)
+gr_mm <- load_gr_list(id_df = ids_mm, bl_gr = bl_mm)
 
 
 # Save 
@@ -75,11 +75,11 @@ gr_mm <- load_gr_list(id_df = ids_mm, bl_gr = bl_gr_mm)
 
 saveRDS(
   object = gr_hg,
-  file = paste0(gr_dir, "human_batch1_grlist_", date, ".RDS")
+  file = grlist_hg_path
 )
 
 
 saveRDS(
   object = gr_mm,
-  file = paste0(gr_dir, "mouse_batch1_grlist_", date, ".RDS")
+  file = grlist_mm_path
 )

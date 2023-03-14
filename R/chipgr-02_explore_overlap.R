@@ -13,14 +13,13 @@ source("R/setup-01_config.R")
 source("R/utils/range_table_functions.R")
 
 window_size <- 150  # padding to add to either direction of peak summit
-outfile <- paste0(scratch_dir, date, "_count_mat_list.RDS")
 
 # GRanges objects
-gr_hg <- readRDS(paste0(gr_dir, "human_batch1_grlist_", date, ".RDS"))
-gr_mm <- readRDS(paste0(gr_dir, "mouse_batch1_grlist_", date, ".RDS"))
+gr_hg <- readRDS(grlist_hg_path)
+gr_mm <- readRDS(grlist_mm_path)
 
 # batch 1 ChIP-seq meta
-meta <- read.delim(paste0(meta_dir, "Chipseq/batch1_chip_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
+meta <- read.delim(chip_meta_path, stringsAsFactors = FALSE)
 
 stopifnot(all(meta$Experiment_ID %in% c(names(gr_hg), names(gr_mm))))
 
@@ -432,7 +431,7 @@ get_count_mat <- function(all_gr, gr_list, meta, cores) {
 # range in get_count_mat()
 
 
-if (!file.exists(outfile)) {
+if (!file.exists(ol_count_path)) {
   
   count_mat_hg <- list(
     All = get_count_mat(all_hg$All, gr_hg, meta_hg, cores),
@@ -448,11 +447,11 @@ if (!file.exists(outfile)) {
     Reduced_resize = get_count_mat(all_mm$Reduced_resize, gr_rs_mm, meta_mm, cores)
   )
   
-  saveRDS(list(Human = count_mat_hg, Mouse = count_mat_mm), outfile) 
+  saveRDS(list(Human = count_mat_hg, Mouse = count_mat_mm), ol_count_path) 
   
   } else {
   
-  dat <- readRDS(outfile)
+  dat <- readRDS(ol_count_path)
   count_mat_hg <- dat$Human
   count_mat_mm <- dat$Mouse
 

@@ -10,15 +10,14 @@ source("R/setup-01_config.R")
 source("R/utils/range_table_functions.R")
 source("R/utils/similarity_functions.R")
 
-pipeline_dir <- paste0(pipeout_dir, "chip/")
 plot_dir <- file.path(cplot_dir, "GRanges/")
 
 # GRanges objects
-gr_hg <- readRDS(paste0(gr_dir, "human_batch1_grlist_", date, ".RDS"))
-gr_mm <- readRDS(paste0(gr_dir, "mouse_batch1_grlist_", date, ".RDS"))
+gr_hg <- readRDS(grlist_hg_path)
+gr_mm <- readRDS(grlist_mm_path)
 
 # Region by TF counts
-count_list <- readRDS(paste0(scratch_dir, date, "_count_mat_list.RDS"))
+count_list <- readRDS(ol_count_path)
 
 # cCRE tables -> GR objects
 ccre_hg <- read.delim(ccre_path_hg, stringsAsFactors = FALSE)
@@ -30,7 +29,7 @@ ccre_mm <- makeGRangesFromDataFrame(ccre_mm, keep.extra.columns = TRUE)
 ccre_mm$Group <- str_replace_all(ccre_mm$Group, ",|-", "_")
 
 # batch 1 ChIP-seq meta
-meta <- read.delim(paste0(meta_dir, "Chipseq/batch1_chip_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
+meta <- read.delim(chip_meta_path, stringsAsFactors = FALSE)
 
 stopifnot(all(meta$Experiment_ID %in% c(names(gr_hg), names(gr_mm))))
 
