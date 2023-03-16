@@ -8,30 +8,25 @@ library(tidyverse)
 source("R/setup-01_config.R")
 source("R/utils/ranking_functions.R")
 
-# rank is for the list of final ranking dfs for each TR 
-# dat is for the list that collects all effect size matrices and meta
-rank_outfile <- paste0(scratch_dir, date, "_ranked_target_list.RDS")
-dat_outfile <- paste0(scratch_dir, date, "_all_data_list.RDS")
-
 # Loading perturb data
 perturb_meta <- read.delim(perturb_meta_path, stringsAsFactors = FALSE)
-perturb_hg <- readRDS(paste0(pmat_dir, "human_list_perturb_matrix_", date, ".RDS"))
-perturb_mm <- readRDS(paste0(pmat_dir, "mouse_list_perturb_matrix_", date, ".RDS"))
-perturb_ortho <- readRDS(paste0(pmat_dir, "ortho_list_perturb_matrix_", date, ".RDS"))
-tf_de <- readRDS(paste0(expr_dir, "TF_perturb_DE_counts_list_by_TF_FDR01_", date, ".RDS"))
+perturb_hg <- readRDS(pmat_path_hg)
+perturb_mm <- readRDS(pmat_path_mm)
+perturb_ortho <- readRDS(pmat_path_ortho)
+tf_de <- readRDS(prank_path_group)
 
 # Loading ChIP-seq data
-chip_meta <- read.delim(paste0(meta_dir, "Chipseq/batch1_chip_meta_final_", date, ".tsv"), stringsAsFactors = FALSE)
-chip_hg <- readRDS(paste0(cmat_dir, "Human_refseq_", date, "_processed_bindmat_list_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=FALSE_binary=", binary_dist/1e3, "kb.RDS"))
-chip_mm <- readRDS(paste0(cmat_dir, "Mouse_refseq_", date, "_processed_bindmat_list_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=FALSE_binary=", binary_dist/1e3, "kb.RDS"))
-chip_ortho <- readRDS(paste0(cmat_dir, "Ortho_refseq_", date, "_processed_bindmat_list_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=FALSE_binary=", binary_dist/1e3, "kb.RDS"))
-bind_summary <- readRDS(paste0(scratch_dir, date, "_refseq_bind_summary.RDS"))
+chip_meta <- read.delim(chip_meta_path, stringsAsFactors = FALSE)
+chip_hg <- readRDS(blist_hg_path)
+chip_mm <- readRDS(blist_mm_path)
+chip_ortho <- readRDS(blist_ortho_path)
+bind_summary <- readRDS(bind_summary_path)
 
 # low throughput resource of curated targets
-lt_curated <- read.delim(paste0(meta_dir, "Curated_targets_all_July2022.tsv"), stringsAsFactors = FALSE)
+lt_curated <- read.delim(curated_path_all, stringsAsFactors = FALSE)
 
 # Map of orthologous genes 
-pc_ortho <- read.delim(paste0(meta_dir, "hg_mm_1to1_ortho_genes_DIOPT-v8.tsv"), stringsAsFactors = FALSE)
+pc_ortho <- read.delim(ortho_path, stringsAsFactors = FALSE)
 
 
 # Each data type has its own global filtering steps. For simplicity, only 
@@ -316,5 +311,5 @@ rank_list <- list(
 
 # Save out
 
-saveRDS(all_dat, file = dat_outfile)
-saveRDS(rank_list, rank_outfile)
+saveRDS(all_dat, file = alldat_path)
+saveRDS(rank_list, file = rank_path)

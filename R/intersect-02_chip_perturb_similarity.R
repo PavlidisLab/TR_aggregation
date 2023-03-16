@@ -14,11 +14,10 @@ source("R/utils/plot_functions.R")
 
 topn <- 500  # number of top genes to consider when doing overlap
 common_arg <- TRUE  # should comparison only be done for mutually measured genes?
-outfile <- paste0(scratch_dir, date, "_intersect_similarity.RDS")
-plot_dir <- paste0(iplot_dir, "Experiment_similarity/")
+plot_dir <- file.path(iplot_dir, "Experiment_similarity/")
 
 # Loading all data
-dat <- readRDS(paste0(scratch_dir, date, "_all_data_list.RDS"))
+dat <- readRDS(alldat_path)
 
 
 # General workflow is to generate exp x exp matrices where elements represent
@@ -53,7 +52,7 @@ pval_list <- lapply(dat$Perturbation, function(x) {
 
 
 
-if (!file.exists(outfile)) {
+if (!file.exists(intersect_sim_path)) {
   
   sim_list <- list(
     Human = intersect_sim_list(
@@ -81,11 +80,11 @@ if (!file.exists(outfile)) {
   
   df_list <- lapply(sim_list, format_and_merge, symmetric_arg = FALSE)
   
-  saveRDS(list(sim_list = sim_list, df_list = df_list), file = outfile)
+  saveRDS(list(sim_list = sim_list, df_list = df_list), file = intersect_sim_path)
   
 } else {
   
-  temp_load <- readRDS(outfile)
+  temp_load <- readRDS(intersect_sim_path)
   df_list <- temp_load$df_list
   sim_list <- temp_load$sim_list
   rm(temp_load)

@@ -14,22 +14,22 @@ source("R/setup-01_config.R")
 source("R/utils/plot_functions.R")
 source("R/utils/ranking_functions.R")
 
-plot_dir <- paste0(iplot_dir, "Gene_rankings/")
+plot_dir <- file.path(iplot_dir, "Gene_rankings/")
 
 # List of all TR rankings and data matrices
-rank_list <- readRDS(paste0(scratch_dir, date, "_ranked_target_list.RDS"))
-dat_list <- readRDS(paste0(scratch_dir, date, "_all_data_list.RDS"))
+rank_list <- readRDS(rank_path)
+dat_list <- readRDS(alldat_path)
 
 # Curated targets
-lt_all <- read.delim(paste0(meta_dir, "Curated_targets_all_July2022.tsv"), stringsAsFactors = FALSE)
+lt_all <- read.delim(curated_path_all, stringsAsFactors = FALSE)
 
 # Mapping of orthologous genes
-pc_ortho <- read.delim(paste0(meta_dir, "hg_mm_1to1_ortho_genes_DIOPT-v8.tsv"), stringsAsFactors = FALSE)
+pc_ortho <- read.delim(ortho_path, stringsAsFactors = FALSE)
 tfs_hg <- names(rank_list$Human)
 tfs_mm <- names(rank_list$Mouse)
 
 # Object that contains the topn overlapping genes between experiments
-ol_list <- readRDS(paste0(scratch_dir, date, "_intersect_similarity.RDS"))
+ol_list <- readRDS(intersect_sim_path)
 
 
 # Describe count of curated targets and experimental types per TR. Note: For 
@@ -83,7 +83,7 @@ n_unique <- n_distinct(unlist(
 
 n_type <- lt_sub %>% 
   mutate(TF_Symbol = factor(TF_Symbol, levels = unique(n_target$Symbol))) %>% 
-  count(Experiment_Type, TF_Symbol, name = "Count")
+  dplyr::count(Experiment_Type, TF_Symbol, name = "Count")
 
 
 # The following creates a list of count matrices tallying the count of experiments
@@ -95,7 +95,7 @@ get_exp_counts <- function(lt_df) {
   
   count_l <- lapply(l_split, function(x) {
     
-    a <- count(x, Target_Symbol, Experiment_Type)
+    a <- dplyr::count(x, Target_Symbol, Experiment_Type)
     b <- matrix(0, nrow = n_distinct(a$Target_Symbol), ncol = 5)
     rownames(b) <- unique(a$Target_Symbol)
     colnames(b) <- c(unique(n_type$Experiment_Type), "Sum")
@@ -173,28 +173,28 @@ tally_auprc <- lapply(max_auprc, table)
 # Inspecting the top 5 curated targets for each rank
 
 
-top5 <- function(df, rank) {
+topn <- function(df, rank, n = 5) {
   df %>% 
-    arrange(!!sym(rank)) %>% 
     filter(Curated_target) %>% 
-    slice_head(n = 5) %>% 
-    select(!!sym(rank), Symbol)
+    slice_min(!!sym(rank), n = n) %>% 
+    dplyr::select(!!sym(rank), Symbol)
 }
 
 
-top5_all <- function(df) {
+
+topn_all <- function(df, n = 5) {
   list(
-    Integrated = top5(df, "Rank_integrated"),
-    Bind = top5(df, "Rank_binding"),
-    Perturb = top5(df, "Rank_perturbation")
+    Integrated = topn(df, "Rank_integrated", n),
+    Bind = topn(df, "Rank_binding", n),
+    Perturb = topn(df, "Rank_perturbation", n)
   )
 }
 
 
-top5_list <- list(
-  Human = lapply(rank_list$Human, top5_all),
-  Mouse = lapply(rank_list$Mouse, top5_all),
-  Ortho = lapply(rank_list$Ortho, top5_all)
+topn_list <- list(
+  Human = lapply(rank_list$Human, topn_all),
+  Mouse = lapply(rank_list$Mouse, topn_all),
+  Ortho = lapply(rank_list$Ortho, topn_all)
 )
 
 
@@ -363,10 +363,11 @@ p1 <- n_target %>%
   ylab("Count of unique curated targets") +
   scale_y_continuous(breaks = seq(0, 160, 40)) +
   theme_classic() +
-  theme(axis.title = element_text(size = 35),
+  theme(axis.title = element_text(size = 40),
         axis.title.x = element_blank(),
-        axis.text.y = element_text(size = 30),
-        axis.text.x = element_text(size = 30, angle = 90, vjust = 0.5, hjust = 1))
+        axis.text.y = element_text(size = 35),
+        axis.text.x = element_text(size = 35, angle = 90, vjust = 0.5, hjust = 1),
+        plot.margin = margin(10, 10, 10, 10))
 
 
 p2 <- 
@@ -375,13 +376,14 @@ p2 <-
   ylab("Count of experiments") +
   theme_classic() +
   scale_fill_manual(values = c('#66c2a5','#fc8d62','#8da0cb','#e78ac3')) +
-  theme(axis.title = element_text(size = 35),
+  theme(axis.title = element_text(size = 40),
         axis.title.x = element_blank(),
-        axis.text.y = element_text(size = 30),
-        axis.text.x = element_text(size = 30, angle = 90, vjust = 0.5, hjust = 1),
-        legend.text = element_text(size = 30),
-        legend.title = element_text(size = 30),
-        legend.position = c(0.75, 0.85))
+        axis.text.y = element_text(size = 35),
+        axis.text.x = element_text(size = 35, angle = 90, vjust = 0.5, hjust = 1),
+        legend.text = element_text(size = 35),
+        legend.title = element_text(size = 35),
+        legend.position = c(0.75, 0.85),
+        plot.margin = margin(10, 10, 10, 10))
 
 
 
@@ -410,8 +412,8 @@ plot_box <- function(df, tf, wilx, tf_pal) {
     theme(axis.title = element_text(size = 25),
           axis.text.y = element_text(size = 25),
           axis.text.x = element_text(size = 25),
-          plot.title = element_text(size = 20),
-          plot.subtitle = element_text(size = 15))
+          plot.title = element_text(size = 25),
+          plot.subtitle = element_text(size = 20))
   
   # binding boxplot
   
@@ -428,8 +430,8 @@ plot_box <- function(df, tf, wilx, tf_pal) {
     theme(axis.title = element_text(size = 25),
           axis.text.y = element_text(size = 25),
           axis.text.x = element_text(size = 25),
-          plot.title = element_text(size = 20),
-          plot.subtitle = element_text(size = 15))
+          plot.title = element_text(size = 25),
+          plot.subtitle = element_text(size = 20))
   
   # combine
   
@@ -479,11 +481,11 @@ plot_pr <- function(pr_list, auc_df, tf, colours) {
     scale_color_manual(labels = auc_labels, values = colours) +
     theme_classic() +
     theme(axis.text = element_text(size = 25),
-          axis.title = element_text(size = 25),
-          plot.title = element_text(size = 25),
+          axis.title = element_text(size = 30),
+          plot.title = element_text(size = 30),
           legend.title = element_blank(),
           legend.text = element_text(size = 25),
-          legend.position = c(0.65, 0.85))
+          legend.position = c(0.55, 0.85))
   
 }
 
@@ -512,7 +514,7 @@ ggsave(plist_mm2$Pax6, dpi = 300, device = "png", height = 8, width = 8,
 # Distn of sampled AUPRCs overlaid with observed
 
 
-plot_sample_auprc <- function(sample_list, auprc_df, tf) {
+plot_sample_auprc <- function(sample_list, auprc_df, tf, colours) {
   
   data.frame(AUPRC = sample_list[[tf]]) %>% 
     ggplot(., aes(x = AUPRC)) +
@@ -523,26 +525,33 @@ plot_sample_auprc <- function(sample_list, auprc_df, tf) {
     xlim(c(NA, max(auprc_df[tf,] ) * 1.2)) +  # pad xlim as observed typically greater
     ylab("Count") +
     ggtitle(paste0(tf, ": Sampled targets relative to curated")) +
-    scale_colour_manual(values = rank_cols, labels = names(rank_cols)) +
+    scale_colour_manual(values = colours) +
     theme_classic() +
     theme(axis.text = element_text(size = 25),
-          axis.title = element_text(size = 25),
-          plot.title = element_text(size = 25),
+          axis.title = element_text(size = 30),
+          plot.title = element_text(size = 30),
           legend.title = element_blank(),
-          legend.text = element_text(size = 25),
+          legend.text = element_text(size = 27),
           legend.position = c(0.90, 0.90),
+          legend.background = element_blank(),
           plot.margin = margin(10, 20, 10, 10))
 }
 
 
 plist_hg3 <- lapply(tfs_hg, function(x) {
-  plot_sample_auprc(sample_target_list$Human, auprc_df = auprc_list$Human, x)
+  plot_sample_auprc(sample_target_list$Human, 
+                    auprc_df = auprc_list$Human, 
+                    tf = x,
+                    colours = rank_cols)
 })
 names(plist_hg3) <- tfs_hg
 
 
 plist_mm3 <- lapply(tfs_mm, function(x) {
-  plot_sample_auprc(sample_target_list$Mouse, auprc_df = auprc_list$Mouse, x)
+  plot_sample_auprc(sample_target_list$Mouse, 
+                    auprc_df = auprc_list$Mouse,
+                    tf = x,
+                    colours = rank_cols)
 })
 names(plist_mm3) <- tfs_mm
 
@@ -555,7 +564,7 @@ ggsave(plist_hg3$ASCL1, dpi = 300, device = "png", height = 8, width = 12,
 # Distribution of individual experiment AUPRCs overlaid with observed aggregated
 
 
-plot_group_auprc <- function(auprc_list, tf) {
+plot_group_auprc <- function(auprc_list, tf, colours) {
   
   ggplot(auprc_list$AUPRC_df, aes(x = Group, y = AUPRC)) +
     geom_violin(width = 0.4, fill = "lightslategrey") +
@@ -563,26 +572,28 @@ plot_group_auprc <- function(auprc_list, tf) {
     geom_hline(aes(yintercept = auprc_list$AUPRC_agg$Integrated, col = "Integrated"), size = 1, linetype = "solid") +
     geom_hline(aes(yintercept = auprc_list$AUPRC_agg$Perturbation, col = "Perturbation"), size = 1, linetype = "solid") +
     geom_hline(aes(yintercept = auprc_list$AUPRC_agg$Binding, col = "Binding"), size = 1, linetype = "solid") +
-    scale_color_manual("Integrated: ", values = rank_cols, breaks = names(rank_cols)) +
+    # scale_color_manual("Integrated: ", values = rank_cols, breaks = names(rank_cols)) +
+    scale_color_manual(values = colours) +
     scale_x_discrete("Individual experiments", labels = c("Binding", "Perturbation", "Rank product")) +
     ggtitle(paste0(tf, ": Aggregated relative to individual experiments")) +
     theme_classic() +
     theme(axis.text = element_text(size = 25),
-          axis.title = element_text(size = 25),
-          plot.title = element_text(size = 25),
-          legend.title = element_text(size = 25),
-          legend.text = element_text(size = 25),
+          axis.title = element_text(size = 30),
+          plot.title = element_text(size = 27),
+          legend.title = element_text(size = 27),
+          legend.text = element_text(size = 27),
           plot.margin = margin(10, 20, 10, 10))
 }
 
 
-plist_hg4 <- lapply(tfs_hg, function(x) plot_group_auprc(hg[[x]], x))
+
+plist_hg4 <- lapply(tfs_hg, function(x) plot_group_auprc(hg[[x]], tf = x, colours = rank_cols))
 names(plist_hg4) <- tfs_hg
 
-plist_mm4 <- lapply(tfs_mm, function(x) plot_group_auprc(mm[[x]], x))
+plist_mm4 <- lapply(tfs_mm, function(x) plot_group_auprc(mm[[x]], tf = x, colours = rank_cols))
 names(plist_mm4) <- tfs_mm
 
-plist_ortho4 <- lapply(tfs_hg, function(x) plot_group_auprc(ortho[[x]], x))
+plist_ortho4 <- lapply(tfs_hg, function(x) plot_group_auprc(ortho[[x]], tf = x, colours = rank_cols))
 names(plist_ortho4) <- tfs_hg
 
 

@@ -12,14 +12,14 @@ topn <- 500  # number of top genes to consider
 plot_dir <- file.path(iplot_dir, "Gene_rankings/")
 
 # List of all TR rankings and data matrices
-rank_list <- readRDS(paste0(scratch_dir, date, "_ranked_target_list.RDS"))
-dat_list <- readRDS(paste0(scratch_dir, date, "_all_data_list.RDS"))
+rank_list <- readRDS(rank_path)
+dat_list <- readRDS(alldat_path)
 
 # Curated targets
-lt_all <- read.delim(paste0(meta_dir, "Curated_targets_all_July2022.tsv"), stringsAsFactors = FALSE)
+lt_all <- read.delim(curated_path_all, stringsAsFactors = FALSE)
 
 # Mapping of orthologous genes
-pc_ortho <- read.delim(paste0(meta_dir, "hg_mm_1to1_ortho_genes_DIOPT-v8.tsv"), stringsAsFactors = FALSE)
+pc_ortho <- read.delim(ortho_path, stringsAsFactors = FALSE)
 tfs_hg <- names(rank_list$Human)
 tfs_mm <- names(rank_list$Mouse)
 
