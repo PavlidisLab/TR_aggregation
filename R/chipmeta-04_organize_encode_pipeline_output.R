@@ -22,6 +22,7 @@ qc_out <- file.path(pipeout_dir, "qc_reports", paste0("batch1_qcfiles_", date, "
 
 # table associating experiment IDs to its corresponding output directory
 run_dir_output <- file.path(meta_dir, "Chipseq", paste0("batch1_run_dirs_", date, ".tsv"))
+stopifnot(identical(run_dir_output, chip_run_path)) # declared in config
 
 # output metadata of all processed ChIP-seq samples
 meta_sample_output <- file.path(meta_dir, "Chipseq", paste0("batch1_chip_meta_all_", date, ".tsv"))
