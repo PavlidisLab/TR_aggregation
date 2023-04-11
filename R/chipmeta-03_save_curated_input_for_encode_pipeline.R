@@ -71,7 +71,7 @@ for (tf in tfs) {
       row.names = FALSE,
       col.names = FALSE,
       sep = "\t",
-      file = paste0(fastq_dir, tf, "_hg_fastq_dl_input.tsv")
+      file = file.path(fastq_out, paste0(tf, "_hg_fastq_dl_input.tsv"))
     )
   }
   
@@ -95,7 +95,7 @@ for (tf in tfs) {
       row.names = FALSE,
       col.names = FALSE,
       sep = "\t",
-      file = paste0(fastq_dir, tf, "_mm_fastq_dl_input.tsv")
+      file = file.path(fastq_out, paste0(tf, "_mm_fastq_dl_input.tsv"))
     )
   }
 }
