@@ -344,8 +344,8 @@ plot_scatter <- function(df, tf) {
                 aes(x = Mean_bind, y = Count_DE, fill = Group),
                 alpha = 1, shape = 21, size = 3, col = "black", height = 0.3, width = 0.01) +
     geom_text_repel(data = df[df$Group == "Top", ],
-                    aes(x = Mean_bind, y = Count_DE, label = Symbol),
-                    force = 1, force_pull = 2, size = 7, max.overlaps = 20) +
+                    aes(x = Mean_bind, y = Count_DE, label = Symbol, fontface = "italic"),
+                    force = 1, force_pull = 1.5, size = 7, max.overlaps = 20) +
     xlab("Mean binding score") +
     ylab("Count DE (FDR < 0.1)") +
     ggtitle(tf) +

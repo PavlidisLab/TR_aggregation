@@ -466,7 +466,7 @@ p4a <- all_de$Human %>%
   geom_jitter(aes(x = Count_DE, y = DE_prior_rank), 
               data = . %>% filter(!Top_count),
               shape = 21, size = 1, alpha = 0.4, width = 0.1, height = 0.1) +
-  geom_text_repel(aes(x = Count_DE, y = DE_prior_rank, label = Symbol),
+  geom_text_repel(aes(x = Count_DE, y = DE_prior_rank, label = Symbol, fontface = "italic"),
                   data = . %>% filter(Top_count),
                   force = 0.5, force_pull = 0.5, size = 5) +
   theme_classic() +
@@ -506,7 +506,7 @@ p4_list <- lapply(names(top_list), function(x) {
           axis.title = element_text(size = 25),
           axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1), 
           axis.title.x = element_blank(),
-          plot.title = element_text(size = 20, hjust = 0.5))
+          plot.title = element_text(size = 20, hjust = 0.5, face = "italic"))
 })
 
 

@@ -556,6 +556,11 @@ color_breaks_hg <- seq(min(genes_hg), max(genes_hg), length.out = pal_length)
 color_breaks_mm <- seq(min(genes_mm), max(genes_mm), length.out = pal_length)
 
 
+italic_rows_hg <- lapply(rownames(genes_hg), function(x) bquote(italic(.(x))))
+italic_rows_mm <- lapply(rownames(genes_mm), function(x) bquote(italic(.(x))))
+
+
+
 pheatmap(
   genes_hg,
   cluster_rows = FALSE,
@@ -570,9 +575,9 @@ pheatmap(
   angle_col = 90,
   fontsize_row = 13,
   fontsize_col = 15,
+  labels_row = as.expression(italic_rows_hg),
   filename = paste0(plot_dir, "Bind_specificity_heatmap_human_", date, ".png")
 )
-
 
 
 pheatmap(
@@ -589,6 +594,7 @@ pheatmap(
   angle_col = 90,
   fontsize_row = 13,
   fontsize_col = 15,
+  labels_row = as.expression(italic_rows_mm),
   filename = paste0(plot_dir, "Bind_specificity_heatmap_mouse_", date, ".png")
 )
 

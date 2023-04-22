@@ -219,7 +219,12 @@ bind_vboxplot <- function(mat, plot_genes, ncol = 1, species) {
         axis.text = element_text(size = 20),
         axis.title.y = element_text(size = 20),
         axis.title.x = element_blank(),
-        plot.title = element_text(size = 20, hjust = 0.5, colour = "darkred")
+        plot.title = element_text(
+          size = 20,
+          hjust = 0.5,
+          colour = "darkred",
+          face = "italic"
+        )
       )
     
     # Only want TF x axis labels on bottom plot
@@ -272,8 +277,8 @@ topbound_plot <- function(bind_df,
                aes(y = Proportion_binary, x = Mean_bind),
                shape = 21, size = 2.3, alpha = 0.4, colour = "black") +
     geom_text(data = filter(plot_df, Top),
-              check_overlap = TRUE,
-              aes(y = Proportion_binary, x = Mean_bind, label = Symbol)) +
+              aes(y = Proportion_binary, x = Mean_bind, label = Symbol, fontface = "italic"),
+              check_overlap = TRUE) +
     ylab("Proportion of bound experiments (+/- 25kb)") +
     xlab("Mean binding score") +
     ggtitle(title) +
@@ -281,7 +286,7 @@ topbound_plot <- function(bind_df,
     theme(
       axis.text = element_text(size = 20),
       axis.title = element_text(size = 20),
-      plot.title = element_text(size = 20, hjust = 0.5),
+      plot.title = element_text(size = 20, hjust = 0.5, face = "italic"),
       legend.position = "none"
     )
   
@@ -320,9 +325,10 @@ fc_heatmap <- function(tf,
   anno$Perturbation <- factor(anno$Perturbation, levels = unique(anno$Perturbation))
   droplevels(anno)
   rownames(anno) <- colnames(fc_mat)
-  
 
   color_breaks <- seq(FC_min, FC_max, length.out = pal_length)
+  italic_rows <- lapply(symbols, function(x) bquote(italic(.(x))))
+  
   
   pheatmap(
     fc_mat,
@@ -341,7 +347,8 @@ fc_heatmap <- function(tf,
     fontsize_row = 20,
     legend = legend_arg,
     height = 6,
-    width = 9
+    width = 9,
+    labels_row = as.expression(italic_rows)
   )
 }
 
@@ -384,6 +391,10 @@ depr_heatmap <- function(tf_df,
     pal <- depr_pal
   }
   
+  
+  italic_rows <- lapply(symbols, function(x) bquote(italic(.(x))))
+  
+  
   pheatmap(
       deprior[, "DE_prior_rank", drop = FALSE],
       color = pal,
@@ -396,7 +407,7 @@ depr_heatmap <- function(tf_df,
       cellwidth = 20,
       legend = legend_arg,
       height = 6,
-      width = 9
+      width = 9,
+      labels_row = as.expression(italic_rows)
     )
 }
-
