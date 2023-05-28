@@ -539,10 +539,6 @@ plot_tf_hist <- function(tf_list, meta, species, tf_pal) {
       ggtitle(paste0(tf, " n=", n_tf)) +
       scale_x_continuous(breaks = pretty_breaks) +
       theme(
-        # axis.text = element_text(size = 30),
-        # axis.title = element_text(size = 30),
-        # plot.title = element_text(size = 35),
-        # plot.margin = margin(10, 15, 10, 10))
         axis.text = element_text(size = 35),
         axis.title = element_text(size = 35),
         plot.title = element_text(size = 34),
