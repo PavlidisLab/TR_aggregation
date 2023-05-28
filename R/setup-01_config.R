@@ -1,13 +1,5 @@
 ## This script establishes pathing of data and plots used throughout the project
-## TODO: consolidate expression dirs (and parts of scratch)
-## TODO: collapsing meta paths/subdirs? (eg meta/chipseq/atlas append)
-## TODO: schematic of ChIP-seq workflow
-## TODO: input for pipeline install and fastq download better organized
-## TODO: ask about local vs utils functions
-## TODO: pathing of pipeout chip/
-## TODO: bulky plot functions local or utils?
-## TODO: ask about bulky config!
-## TODO: filepath instead of paste0
+
 
 # Variables of interest
 # ------------------------------------------------------------------------------
@@ -21,21 +13,18 @@ binary_dist <- 25e3  # Absolute distance threshold used for binary gene scores
 fdr <- 0.1  # False discovery rate for perturbation experiments to be diff expr. 
 
 
-# TODO: better data pathing
-# Scratch location where outputs were variably saved
-scratch_dir <- "/space/scratch/amorin/R_objects/"
-
-
-
-# Hard-coded data paths on Pavlab
+# Hard-coded data paths on Pavlab servers
 # ------------------------------------------------------------------------------
 
 
+# Scratch location where outputs were variably saved
+scratch_dir <- "/space/scratch/amorin/R_objects/"
+
 # ENCODE pipeline installation
-encode_dir <- "/space/grp/amorin/Projects/encode-pipeline/"
+encode_dir <- "/home/amorin/Projects/encode-pipeline/"
 
 # Where downloaded fastq files live
-fastq_dir <- "/cosmos/data/downloaded-data/chipseq"
+fastq_dir <- "/cosmos/data/downloaded-data/chipseq/"
 
 # Where the ENCODE pipeline output lives
 pipeout_dir <-  "/cosmos/data/pipeline-output/chipseq-encode-pipeline/"
@@ -51,7 +40,8 @@ depr_in_mm <- "/home/nlim/MDE/RScripts/Chapter_4/SPACE_RDATA/Analysis/mouse/Fina
 diopt_path <- "/space/grp/DIOPT/DIOPTvs8_export_Sanja Rogic.txt"
 
 
-# Googlesheets IDs for curated sheets
+# Googlesheets IDs for curated sheets. Access is currently restricted, please
+# contact if more info is required!
 # ------------------------------------------------------------------------------
 
 
@@ -61,8 +51,7 @@ gsheets_perturb <- "1oXo1jfoPYcX94bq2F6Bqm1Es1glc8g9mnJvYAO37Vw4"
 # ChIP-seq metadata
 gsheets_chip <- "1rGVnLL0eXHqr97GM1tloiWwwrJUUmj_ZjW5UOHFN1cc"
 
-# Curated targets - note that this is a copy of the master sheet taken on July 
-# 4th 2022 as a data freeze
+# Curated targets: this is a copy/freeze of the master sheet taken on July 4th 2022
 gsheets_curated <- "1ngjKoRGaOgF-8BlxUPK7o7XRg7wimTxYYQkSokSVYUM"
 
 
@@ -73,7 +62,13 @@ gsheets_curated <- "1ngjKoRGaOgF-8BlxUPK7o7XRg7wimTxYYQkSokSVYUM"
 meta_dir <- "/space/grp/amorin/Metadata/"
 
 # Final curated perturbation experiment metadata
-perturb_meta_path <- paste0(meta_dir, "batch1_tfperturb_meta_final_", date, ".tsv")
+perturb_meta_path <- file.path(meta_dir, paste0("batch1_tfperturb_meta_final_", date, ".tsv"))
+
+# Final curated ChIP-seq experiment metadata
+chip_meta_path <- file.path(meta_dir, "Chipseq", paste0("batch1_chip_meta_final_", date, ".tsv"))
+
+# Table that associates ChIP-seq experiments/runs with pipeline directory
+chip_run_path <- file.path(meta_dir, "Chipseq", paste0("batch1_run_dirs_", date, ".tsv"))
 
 # ENCODE blacklists
 bl_path_hg <- "/space/grp/amorin/Chromosome_info/blacklist_hg38.tsv"
@@ -114,11 +109,40 @@ curated_path_pavlab <- paste0(meta_dir, "Curated_targets_pavlab_July2022.tsv")
 # ------------------------------------------------------------------------------
 
 
-# Gene x experiment bind score matirces
+# Gene x experiment bind score matrices
 cmat_dir <- "/space/grp/amorin/Annotated_objects/Bind_matrices/Encpipe/"
 
 # ChIP-seq genomic range objects
 gr_dir <- "/space/grp/amorin/Annotated_objects/GRanges/"
+
+
+# Raw bind score matrices
+bsmat_hg_path <- file.path(cmat_dir, paste0("ouyang_refseq_human_batch1_", date, "_", "dc=5000_intensity=FALSE.RDS"))
+bsmat_mm_path <- file.path(cmat_dir, paste0("ouyang_refseq_mouse_batch1_", date, "_", "dc=5000_intensity=FALSE.RDS"))
+bsmat_ortho_path <- file.path(cmat_dir, paste0("ouyang_refseq_ortho_batch1_", date, "_", "dc=5000_intensity=FALSE.RDS"))
+
+# Binary bind matrices
+binmat_hg_path <- file.path(cmat_dir, paste0("binary_refseq_human_batch1_", date, "_", "distance=", binary_dist/1e3, "kb.RDS"))
+binmat_mm_path <- file.path(cmat_dir, paste0("binary_refseq_mouse_batch1_", date, "_", "distance=", binary_dist/1e3, "kb.RDS"))
+binmat_ortho_path <- file.path(cmat_dir, paste0("binary_refseq_ortho_batch1_", date, "_", "distance=", binary_dist/1e3, "kb.RDS"))
+
+# List of processed matrices
+blist_hg_path <- file.path(cmat_dir, paste0("Human_refseq_", date, "_processed_bindmat_list_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=FALSE_binary=", binary_dist/1e3, "kb.RDS"))
+blist_mm_path <- file.path(cmat_dir, paste0("Mouse_refseq_", date, "_processed_bindmat_list_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=FALSE_binary=", binary_dist/1e3, "kb.RDS"))
+blist_ortho_path <- file.path(cmat_dir, paste0("Ortho_refseq_", date, "_processed_bindmat_list_minpeak=", min_peaks, "_ouyang_dc=5000_intensity=FALSE_binary=", binary_dist/1e3, "kb.RDS"))
+
+# R object of summarized gene binding scores
+bind_summary_path <- file.path(scratch_dir, paste0("bind_summary_refseq_", date, ".RDS"))
+
+# R object of similarity between ChIP-seq experiments
+chip_sim_path <- file.path(scratch_dir, paste0("chip_similarity_refseq_", date, ".RDS"))
+
+# R object of list of experiments as GRange objects
+grlist_hg_path <- file.path(gr_dir, paste0("GRlist_human_", date, ".RDS"))
+grlist_mm_path <- file.path(gr_dir, paste0("GRlist_mouse_", date, ".RDS"))
+
+# List of matrices of region x TR overlap counts
+ol_count_path <- file.path(scratch_dir, paste0("Region_overlap_count_mat_list_", date, ".RDS"))
 
 
 # For trackplot
@@ -165,8 +189,14 @@ perturb_sim_path <- paste0(scratch_dir, "perturb_similarity_", date, ".RDS")
 # Intersect
 # ------------------------------------------------------------------------------
 
+# Output list of summarized TR-target rankings
+rank_path <- file.path(scratch_dir, paste0("ranked_target_list_", date, ".RDS"))
 
+# Output list of all effect size matrices and metadata
+alldat_path <- file.path(scratch_dir, paste0("all_data_list_", date, ".RDS"))
 
+# R object of similarity between perturbation and chipseq experiments
+intersect_sim_path <- file.path(scratch_dir, paste0("intersect_similarity_", date, ".RDS"))
 
 
 # Plot paths
@@ -187,22 +217,6 @@ pplot_subdir <-  c("Meta_sample_matrix/", "Effect_size/", "Describe_FDR_counts/"
 # Integrated data plot paths
 iplot_dir <- file.path(plot_dir, "Intersect/")
 iplot_subdir <- c("Experiment_similarity/", "Gene_rankings")
-
-
-# for (subdir in cplot_subdir) {
-#   dir.create(file.path(cplot_dir, subdir), showWarnings = FALSE)
-# }
-# 
-# 
-# for (subdir in pplot_subdir) {
-#   dir.create(file.path(pplot_dir, subdir), showWarnings = FALSE)
-# }
-# 
-# 
-# for (subdir in iplot_subdir) {
-#   dir.create(file.path(iplot_dir, subdir), showWarnings = FALSE)
-# }
-
 
 
 # Figure exact pathing:
