@@ -1,8 +1,6 @@
-## "Characterizing the targets of transcription regulators by aggregating
+## "Characterizing the targets of transcription regulators by aggregating ChIP-seq and perturbation expression data sets"
 
-## ChIP-seq and perturbation expression data sets"
-
-<https://www.biorxiv.org/content/10.1101/2022.08.30.505909v2>
+<https://genome.cshlp.org/content/33/5/763.long>
 
 Note that multiple aspects of the analysis came from rounds of curation on 
 google sheets, and drawing on data available on the Pavlab servers that are not 
