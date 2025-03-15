@@ -85,8 +85,8 @@ ens_path_hg <- paste0(meta_dir, "ensembl_human_protein_coding_V98.tsv")
 ens_path_mm <- paste0(meta_dir, "ensembl_mouse_protein_coding_V98.tsv")
 
 # Tables of transcription factors
-tf_path_hg <- paste0(meta_dir, "human_tfs.tsv")
-tf_path_mm <- paste0(meta_dir, "mouse_tfs.tsv")
+tf_path_hg <- paste0(meta_dir, "AnimalTFDB_human_V3.tsv")
+tf_path_mm <- paste0(meta_dir, "AnimalTFDB_mouse_V3.tsv")
 
 # Mapping of 1:1 high-confidence orthologous genes
 ortho_path <- paste0(meta_dir, "hg_mm_1to1_ortho_genes_DIOPT-v8.tsv")
